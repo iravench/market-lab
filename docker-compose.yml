@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  timescaledb:
+    image: timescaledb/timescaledb:latest-pg14
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: market_lab
+    ports:
+      - "54320:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+
+volumes:
+  timescaledb_data:
