@@ -23,7 +23,7 @@ The system is composed of three decoupled domains:
 *   [x] **Goal:** A local database populated with reliable historical candles.
 
 ### Phase 2: The Logic Core
-*   [ ] Implement basic technical indicators (SMA, EMA, RSI) as pure functions.
+*   [x] Implement basic technical indicators (SMA, EMA, RSI) as pure functions.
 *   [ ] Create a "Signal Generator" interface.
 *   [ ] **Goal:** The ability to mathematically identify market conditions (e.g., "RSI > 70").
 
