@@ -37,3 +37,69 @@ The system is composed of three decoupled domains:
 *   [ ] Implement a persistent Ledger for portfolio state.
 *   [ ] Build a scheduler to run strategies on live data intervals.
 *   [ ] **Goal:** A "bot" that trades in real-time with fake money.
+
+## 5. Getting Started
+
+### Prerequisites
+*   **Node.js** (v18+)
+*   **Docker & Docker Compose** (for TimescaleDB)
+
+### Setup
+1.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+2.  **Environment Setup:**
+    Create a `.env` file from the example:
+    ```bash
+    cp .env.example .env
+    ```
+3.  **Spin up the Database:**
+    ```bash
+    docker-compose up -d
+    ```
+4.  **Run Migrations:**
+    ```bash
+    npm run migrate
+    ```
+
+### Usage
+*   **Backfill Data:**
+    ```bash
+    npm run backfill <SYMBOL> <START_DATE> <INTERVAL>
+    # Example: npm run backfill CBA.AX 2024-01-01 1d
+    ```
+*   **Verify Data:**
+    ```bash
+    npm run verify <SYMBOL>
+    ```
+*   **Run Tests:**
+    ```bash
+    npm test
+    ```
+
+## 6. Development Guidelines
+
+### Git Commit Style
+We follow a structured commit convention to maintain a clear history:
+1.  **Subject:** A concise summary of the change (e.g., `feat: implement RSI indicator`).
+2.  **Body:** A detailed bulleted list explaining *what* changed and *why*.
+    *   Example:
+        ```text
+        feat: implement core technical indicators (SMA, EMA, RSI)
+
+        - Implemented pure math functions for SMA, EMA, and RSI with Wilder's Smoothing
+        - Established Jest testing suite with 100% coverage
+        - Added detailed documentation for logic and mathematical algorithms
+        ```
+
+### Documentation Strategy
+We treat documentation as a first-class citizen.
+*   **`docs/`:** This folder contains the **Knowledge Base**.
+    *   **Concepts:** If we implement a financial algorithm (like RSI), we document the *math* and *theory* in `docs/logic/`.
+    *   **Design:** Architectural decisions (like Schema Design) go in `docs/design/`.
+*   **Code Comments:** Focus on *why*, not *what*. Complex math should reference the `docs/` files.
+
+### Testing Policy
+*   **Logic Core:** All indicators and strategy logic must have unit tests (`src/logic/__tests__`).
+*   **Zero Regression:** Ensure `npm test` passes before committing logic changes.
