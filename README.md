@@ -24,8 +24,8 @@ The system is composed of three decoupled domains:
 
 ### Phase 2: The Logic Core
 *   [x] Implement basic technical indicators (SMA, EMA, RSI) as pure functions.
-*   [ ] Create a "Signal Generator" interface.
-*   [ ] **Goal:** The ability to mathematically identify market conditions (e.g., "RSI > 70").
+*   [x] Create a "Signal Generator" interface.
+*   [x] **Goal:** The ability to mathematically identify market conditions (e.g., "RSI > 70").
 
 ### Phase 3: The Time Machine (Backtester)
 *   [ ] Build the event loop to replay historical data candle-by-candle.
