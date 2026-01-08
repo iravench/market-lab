@@ -26,3 +26,29 @@ export interface Strategy {
     name: string;
     analyze(candles: Candle[]): Signal;
 }
+
+export interface Trade {
+    timestamp: Date;
+    action: 'BUY' | 'SELL';
+    price: number;
+    quantity: number;
+    fee: number;
+    totalValue: number; // price * quantity + fee (for BUY) or - fee (for SELL)
+}
+
+export interface Position {
+    symbol: string;
+    quantity: number;
+    averagePrice: number;
+}
+
+export interface PortfolioState {
+    cash: number;
+    positions: Map<string, Position>;
+    trades: Trade[];
+}
+
+export interface CommissionConfig {
+    fixed: number;      // Fixed fee per trade (e.g., $10)
+    percentage: number; // Percentage fee (e.g., 0.001 for 0.1%)
+}
