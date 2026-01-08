@@ -36,5 +36,23 @@ graph TD
     F --> H[Log Trade]
     E -- No --> I[Log Neutral State]
     I --> J[End Process]
-    G --> J
+## 3. CLI Usage
+
+### Create a Portfolio
+Initialize a new persistent portfolio in the database.
+```bash
+npm run create-portfolio "My RSI Bot" 10000
+```
+
+### Run the Trading Bot
+Execute the strategy for a specific symbol using a persistent portfolio.
+
+**Dry Run (Safe):**
+```bash
+npm run trade <PORTFOLIO_ID> <SYMBOL> DRY
+```
+
+**Live Paper Trading (Database updates enabled):**
+```bash
+npm run trade <PORTFOLIO_ID> <SYMBOL> LIVE
 ```

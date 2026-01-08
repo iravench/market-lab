@@ -37,7 +37,7 @@ export class Backtester {
             const signal = this.strategy.analyze(visibleHistory);
 
             // 2. Execute Signal in Portfolio
-            this.portfolio.executeSignal(signal, this.symbol);
+            this.portfolio.executeSignal(signal, this.symbol, this.strategy.name);
 
             // 3. Record Equity Snapshot
             equityCurve.push({

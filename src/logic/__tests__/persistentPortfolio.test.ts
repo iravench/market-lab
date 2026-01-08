@@ -38,7 +38,7 @@ describe('PersistentPortfolio', () => {
             action: 'BUY',
             price: 100,
             timestamp: new Date()
-        }, 'AAPL');
+        }, 'AAPL', 'TestStrategy');
 
         // Check In-Memory State
         const state = portfolio.getState();
@@ -66,7 +66,7 @@ describe('PersistentPortfolio', () => {
             action: 'SELL',
             price: 110,
             timestamp: new Date()
-        }, 'AAPL');
+        }, 'AAPL', 'TestStrategy');
 
         // Check DB
         const resPos = await pool.query('SELECT * FROM positions WHERE portfolio_id = $1', [portfolioId]);

@@ -10,6 +10,8 @@
     "backfill": "ts-node src/scripts/backfill.ts",
     "verify": "ts-node src/scripts/verifyData.ts",
     "backtest": "ts-node src/scripts/runBacktest.ts",
+    "trade": "ts-node src/scripts/trade.ts",
+    "create-portfolio": "ts-node src/scripts/createPortfolio.ts",
     "test": "jest"
   },
   "keywords": [],

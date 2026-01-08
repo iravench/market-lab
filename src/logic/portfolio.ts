@@ -29,7 +29,7 @@ export class Portfolio {
      * For simplicity in this early version, we assume a single symbol.
      * We also assume a simple "all-in" or "all-out" strategy for position sizing.
      */
-    public executeSignal(signal: Signal, symbol: string): void {
+    public executeSignal(signal: Signal, symbol: string, strategyName?: string): void {
         if (signal.action === 'BUY') {
             this.buy(symbol, signal.price, signal.timestamp);
         } else if (signal.action === 'SELL') {

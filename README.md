@@ -34,7 +34,7 @@ The system is composed of three decoupled domains:
 *   [x] **Goal:** Verify if a strategy *would have* made money in the past.
 
 ### Phase 4: Paper Trading (Forward Testing)
-*   [ ] Implement a persistent Ledger for portfolio state.
+*   [x] Implement a persistent Ledger for portfolio state.
 *   [ ] Build a scheduler to run strategies on live data intervals.
 *   [ ] **Goal:** A "bot" that trades in real-time with fake money.
 

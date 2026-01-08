@@ -62,23 +62,41 @@ export class PersistentPortfolio extends Portfolio {
     /**
      * Overrides executeSignal to persist changes to the DB atomically.
      */
-    public async executeSignal(signal: Signal, symbol: string): Promise<void> {
-        // 1. Dry Run / InMemory check: 
-        // We calculate what SHOULD happen using the base class logic first
-        // to ensure validity (enough cash, etc).
-        
-        // However, the base class updates in-memory state. 
-        // We need to wrap the DB update in a transaction.
-
+    public async executeSignal(signal: Signal, symbol: string, strategyName: string): Promise<void> {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
+            // 1. Idempotency Check
+            const resDup = await client.query(
+                `SELECT 1 FROM strategy_executions 
+                 WHERE portfolio_id = $1 AND symbol = $2 AND strategy_name = $3 AND candle_time = $4`,
+                [this.portfolioId, symbol, strategyName, signal.timestamp]
+            );
+
+            if (resDup.rows.length > 0) {
+                console.warn(`⚠️  Duplicate execution detected for ${symbol} at ${signal.timestamp.toISOString()}. Skipping.`);
+                await client.query('ROLLBACK');
+                return;
+            }
+
+            // 2. Execute Signal
             if (signal.action === 'BUY') {
                 await this.persistBuy(client, symbol, signal.price, signal.timestamp);
             } else if (signal.action === 'SELL') {
                 await this.persistSell(client, symbol, signal.price, signal.timestamp);
             }
+
+            // 3. Record Execution (even for HOLD? Usually we only track actions to allow retries on logic, 
+            // but for strict idempotency we should track the attempt).
+            // Let's only track IF an action was taken, OR if we want to ensure only one "check" per period.
+            // Requirement says: "prevent duplicate trades". So tracking actions is enough.
+            // But if we want to prevent multiple ANALYSES, we track every candle_time.
+            await client.query(
+                `INSERT INTO strategy_executions (portfolio_id, symbol, strategy_name, candle_time)
+                 VALUES ($1, $2, $3, $4)`,
+                [this.portfolioId, symbol, strategyName, signal.timestamp]
+            );
 
             await client.query('COMMIT');
             

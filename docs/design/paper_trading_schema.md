@@ -25,7 +25,7 @@ Stores currently held assets.
 A historical record of all actions taken by the portfolio.
 *   `id`: UUID
 *   `portfolio_id`: UUID
-*   `timestamp`: Timestamptz
+*   `timestamp`: Timestamptz (Partitioning column)
 *   `action`: Text (BUY/SELL)
 *   `symbol`: Text
 *   `quantity`: Decimal
@@ -33,6 +33,16 @@ A historical record of all actions taken by the portfolio.
 *   `fee`: Decimal
 *   `realized_pnl`: Decimal (Null for BUY)
 *   `reason`: Text (Strategy rationale)
+*   *Constraint:* Primary Key on `(timestamp, id)` to support TimescaleDB hypertable requirements.
+
+### `strategy_executions` (Idempotency)
+Prevents the same strategy from executing multiple times on the same data point.
+*   `portfolio_id`: UUID
+*   `symbol`: Text
+*   `strategy_name`: Text
+*   `candle_time`: Timestamptz
+*   `executed_at`: Timestamptz
+*   *Constraint:* Primary Key on `(portfolio_id, symbol, strategy_name, candle_time)`.
 
 ## 2. Integrity Rules
 1.  **Atomic Transactions:** Every trade must update `positions`, `portfolios.current_cash`, and `ledger_entries` within a single SQL transaction.
