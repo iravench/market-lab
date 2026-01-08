@@ -35,8 +35,8 @@ The system is composed of three decoupled domains:
 
 ### Phase 4: Paper Trading (Forward Testing)
 *   [x] Implement a persistent Ledger for portfolio state.
-*   [ ] Build a scheduler to run strategies on live data intervals.
-*   [ ] **Goal:** A "bot" that trades in real-time with fake money.
+*   [x] Build a scheduler to run strategies on live data intervals (via CLI automation).
+*   [x] **Goal:** A "bot" that trades in real-time with fake money.
 
 ## 5. Getting Started
 
@@ -76,6 +76,22 @@ The system is composed of three decoupled domains:
 *   **Run Tests:**
     ```bash
     npm test
+    ```
+*   **Run Backtest:**
+    ```bash
+    npm run backtest <SYMBOL> <START> <END>
+    # Example: npm run backtest CBA.AX 2023-01-01 2024-01-01
+    ```
+*   **Paper Trading (Bot):**
+    ```bash
+    # 1. Create a Portfolio
+    npm run create-portfolio "My Bot" 10000
+
+    # 2. Run a Dry Run (No DB updates)
+    npm run trade <PORTFOLIO_ID> CBA.AX DRY
+
+    # 3. Run Live (Updates DB)
+    npm run trade <PORTFOLIO_ID> CBA.AX LIVE
     ```
 
 ## 6. Development Guidelines
