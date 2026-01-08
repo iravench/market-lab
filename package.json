@@ -9,6 +9,7 @@
     "migrate": "ts-node src/db/migrate.ts",
     "backfill": "ts-node src/scripts/backfill.ts",
     "verify": "ts-node src/scripts/verifyData.ts",
+    "backtest": "ts-node src/scripts/runBacktest.ts",
     "test": "jest"
   },
   "keywords": [],
