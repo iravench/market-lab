@@ -4,7 +4,6 @@
   "description": "To master financial market mechanics and investment strategies by building a robust, verifiable simulation engine from the ground up. This project serves as both a technical playground (TypeScript/Node.js) and a financial learning tool.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "ts-node src/index.ts",
     "migrate": "ts-node src/db/migrate.ts",
     "backfill": "ts-node src/scripts/backfill.ts",
