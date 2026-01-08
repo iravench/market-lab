@@ -28,8 +28,8 @@ The system is composed of three decoupled domains:
 *   [x] **Goal:** The ability to mathematically identify market conditions (e.g., "RSI > 70").
 
 ### Phase 3: The Time Machine (Backtester)
-*   [ ] Build the event loop to replay historical data candle-by-candle.
-*   [ ] Implement the "Broker" simulation (fees, slippage, order filling).
+*   [x] Build the event loop to replay historical data candle-by-candle.
+*   [x] Implement the "Broker" simulation (fees, slippage, order filling).
 *   [ ] Generate performance reports (Sharpe ratio, Max Drawdown, Total Return).
 *   [ ] **Goal:** Verify if a strategy *would have* made money in the past.
 

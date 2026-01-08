@@ -52,3 +52,17 @@ export interface CommissionConfig {
     fixed: number;      // Fixed fee per trade (e.g., $10)
     percentage: number; // Percentage fee (e.g., 0.001 for 0.1%)
 }
+
+export interface EquitySnapshot {
+    timestamp: Date;
+    cash: number;
+    equity: number;
+}
+
+export interface BacktestResult {
+    initialCapital: number;
+    finalCapital: number;
+    totalReturnPct: number;
+    trades: Trade[];
+    equityCurve: EquitySnapshot[];
+}
