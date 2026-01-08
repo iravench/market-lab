@@ -8,10 +8,10 @@ import {
 } from './types';
 
 export class Portfolio {
-    private cash: number;
-    private positions: Map<string, Position>;
-    private trades: Trade[];
-    private commission: CommissionConfig;
+    protected cash: number;
+    protected positions: Map<string, Position>;
+    protected trades: Trade[];
+    protected commission: CommissionConfig;
 
     constructor(initialCash: number, commission: Partial<CommissionConfig> = {}) {
         this.cash = initialCash;
