@@ -1,15 +1,18 @@
 import { Portfolio } from './portfolio';
 import { Strategy, Candle, BacktestResult, EquitySnapshot } from './types';
+import { PerformanceAnalyzer } from './analysis';
 
 export class Backtester {
     private portfolio: Portfolio;
     private strategy: Strategy;
     private symbol: string;
+    private analyzer: PerformanceAnalyzer;
 
     constructor(strategy: Strategy, portfolio: Portfolio, symbol: string) {
         this.strategy = strategy;
         this.portfolio = portfolio;
         this.symbol = symbol;
+        this.analyzer = new PerformanceAnalyzer();
     }
 
     /**
@@ -44,14 +47,14 @@ export class Backtester {
             });
         }
 
-        const finalCapital = equityCurve[equityCurve.length - 1].equity;
-        const totalReturnPct = ((finalCapital - initialCapital) / initialCapital) * 100;
+        const trades = this.portfolio.getState().trades;
+        const metrics = this.analyzer.calculateMetrics(initialCapital, equityCurve, trades);
 
         return {
             initialCapital,
-            finalCapital,
-            totalReturnPct,
-            trades: this.portfolio.getState().trades,
+            finalCapital: equityCurve[equityCurve.length - 1].equity,
+            metrics,
+            trades,
             equityCurve
         };
     }

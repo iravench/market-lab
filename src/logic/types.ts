@@ -34,6 +34,7 @@ export interface Trade {
     quantity: number;
     fee: number;
     totalValue: number; // price * quantity + fee (for BUY) or - fee (for SELL)
+    realizedPnL?: number; // Only for SELL trades
 }
 
 export interface Position {
@@ -59,10 +60,18 @@ export interface EquitySnapshot {
     equity: number;
 }
 
+export interface BacktestMetrics {
+    totalReturnPct: number;
+    maxDrawdownPct: number;
+    sharpeRatio: number;
+    winRatePct: number;
+    tradeCount: number;
+}
+
 export interface BacktestResult {
     initialCapital: number;
     finalCapital: number;
-    totalReturnPct: number;
+    metrics: BacktestMetrics;
     trades: Trade[];
     equityCurve: EquitySnapshot[];
 }

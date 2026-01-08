@@ -19,8 +19,8 @@ The component responsible for state management. It mimics a real exchange and wa
     *   Calculate Fees & Slippage.
     *   Reject invalid orders (e.g., buying with insufficient funds).
 
-### C. The Reporter
-Analyzes the resulting equity curve to produce metrics.
+### C. The Reporter (PerformanceAnalyzer)
+Analyzes the resulting equity curve to produce metrics. This logic is decoupled from the main loop.
 *   Sharpe Ratio
 *   Max Drawdown
 *   Total Return

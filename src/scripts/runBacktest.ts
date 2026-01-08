@@ -46,7 +46,10 @@ async function main() {
         console.log('=======================================');
         console.log(`Initial Capital: $${result.initialCapital.toFixed(2)}`);
         console.log(`Final Capital:   $${result.finalCapital.toFixed(2)}`);
-        console.log(`Total Return:    ${result.totalReturnPct.toFixed(2)}%`);
+        console.log(`Total Return:    ${result.metrics.totalReturnPct.toFixed(2)}%`);
+        console.log(`Max Drawdown:    ${result.metrics.maxDrawdownPct.toFixed(2)}%`);
+        console.log(`Sharpe Ratio:    ${result.metrics.sharpeRatio.toFixed(3)}`);
+        console.log(`Win Rate:        ${result.metrics.winRatePct.toFixed(2)}%`);
         console.log(`Total Trades:    ${result.trades.length}`);
         
         if (result.trades.length > 0) {

@@ -42,7 +42,7 @@ describe('Backtester', () => {
         expect(result.initialCapital).toBe(initialCash);
         // Buy 100 shares at 100. Price ends at 120. Final value = 120 * 100 = 12000.
         expect(result.finalCapital).toBe(12000);
-        expect(result.totalReturnPct).toBe(20);
+        expect(result.metrics.totalReturnPct).toBe(20);
         expect(result.trades.length).toBe(1);
         expect(result.equityCurve.length).toBe(3);
     });

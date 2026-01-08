@@ -92,6 +92,11 @@ export class Portfolio {
         const fee = (tradeValue * this.commission.percentage) + this.commission.fixed;
         const totalCredit = tradeValue - fee;
 
+        // Calculate Realized PnL
+        // Cost Basis = Average Buy Price (incl fees) * Quantity
+        const costBasis = position.averagePrice * quantity;
+        const realizedPnL = totalCredit - costBasis;
+
         this.cash += totalCredit;
         this.positions.delete(symbol);
 
@@ -101,7 +106,8 @@ export class Portfolio {
             price,
             quantity,
             fee,
-            totalValue: totalCredit
+            totalValue: totalCredit,
+            realizedPnL
         });
     }
 
