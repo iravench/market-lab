@@ -30,8 +30,8 @@ The system is composed of three decoupled domains:
 ### Phase 3: The Time Machine (Backtester)
 *   [x] Build the event loop to replay historical data candle-by-candle.
 *   [x] Implement the "Broker" simulation (fees, slippage, order filling).
-*   [ ] Generate performance reports (Sharpe ratio, Max Drawdown, Total Return).
-*   [ ] **Goal:** Verify if a strategy *would have* made money in the past.
+*   [x] Generate performance reports (Sharpe ratio, Max Drawdown, Total Return).
+*   [x] **Goal:** Verify if a strategy *would have* made money in the past.
 
 ### Phase 4: Paper Trading (Forward Testing)
 *   [ ] Implement a persistent Ledger for portfolio state.
