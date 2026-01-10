@@ -1,4 +1,5 @@
 import { EquitySnapshot, Trade, BacktestMetrics } from './types';
+import { calculateMean, calculateStandardDeviation } from './math';
 
 export class PerformanceAnalyzer {
     
@@ -58,11 +59,9 @@ export class PerformanceAnalyzer {
 
         if (returns.length === 0) return 0;
 
-        // 2. Mean and StdDev
-        const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-        
-        const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
-        const stdDev = Math.sqrt(variance);
+        // 2. Mean and StdDev using shared math utils
+        const mean = calculateMean(returns);
+        const stdDev = calculateStandardDeviation(returns);
 
         if (stdDev < 1e-9) return 0;
 
