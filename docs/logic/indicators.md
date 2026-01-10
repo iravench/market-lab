@@ -61,3 +61,28 @@ Where:
 ### Why use it?
 *   **Reduced Lag:** Because it reacts faster to price changes than the SMA, it is preferred by short-term traders.
 *   **Crossovers:** The "MACD" indicator (Moving Average Convergence Divergence) relies entirely on the relationship between two EMAs (usually 12 and 26 periods).
+
+---
+
+## 4. Average True Range (ATR)
+
+### What is it?
+The ATR is a **volatility indicator** that shows how much an asset moves, on average, during a given time frame. It does not provide trend direction, only the degree of price volatility.
+
+### The Math
+First, we calculate the **True Range (TR)**, which is the greatest of:
+1.  Current High - Current Low
+2.  |Current High - Previous Close|
+3.  |Current Low - Previous Close|
+
+$$ TR = \max[(H - L), |H - C_{prev}|, |L - C_{prev}|] $$
+
+The **ATR** is then calculated using Wilder's Smoothing:
+$$ ATR_t = \frac{(ATR_{prev} \times (N-1)) + TR_t}{N} $$
+
+*Note: The first ATR in a series is the Simple Moving Average (SMA) of the first $N$ True Ranges.*
+
+### How to use it
+*   **Stop Loss Placement:** Setting a stop loss at $2 \times ATR$ below entry ensures the stop is outside the "noise" of normal volatility.
+*   **Volatility-Adjusted Sizing:** Reducing position size when ATR is high and increasing it when ATR is low keeps dollar-risk constant.
+*   **Regime Detection:** Expanding ATR suggests a breakout or increased market stress; contracting ATR suggests consolidation.
