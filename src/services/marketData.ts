@@ -29,7 +29,7 @@ export class MarketDataService {
       }
 
       console.log(`💾 Saving ${result.length} candles to database...`);
-      
+
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -41,19 +41,19 @@ export class MarketDataService {
         `;
 
         for (const candle of result) {
-            // Filter out any null values (Yahoo sometimes has gaps)
-            if (candle.open === null || candle.close === null) continue;
+          // Filter out any null values (Yahoo sometimes has gaps)
+          if (candle.open === null || candle.close === null) continue;
 
-            await client.query(insertText, [
-                candle.date,
-                symbol,
-                interval,
-                candle.open,
-                candle.high,
-                candle.low,
-                candle.close,
-                candle.volume
-            ]);
+          await client.query(insertText, [
+            candle.date,
+            symbol,
+            interval,
+            candle.open,
+            candle.high,
+            candle.low,
+            candle.close,
+            candle.volume
+          ]);
         }
 
         await client.query('COMMIT');

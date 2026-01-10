@@ -27,20 +27,20 @@ async function migrate() {
       if (!applied.has(file) && file.endsWith('.sql')) {
         console.log(`Running migration: ${file}`);
         const content = await fs.readFile(path.join(migrationsDir, file), 'utf-8');
-        
+
         // Simple parser: split by '-- Down' to get only the Up part
         const upScript = content.split('-- Down')[0];
 
         try {
-            await client.query('BEGIN');
-            await client.query(upScript);
-            await client.query('INSERT INTO migrations (name) VALUES ($1)', [file]);
-            await client.query('COMMIT');
-            console.log(`✅ Applied ${file}`);
+          await client.query('BEGIN');
+          await client.query(upScript);
+          await client.query('INSERT INTO migrations (name) VALUES ($1)', [file]);
+          await client.query('COMMIT');
+          console.log(`✅ Applied ${file}`);
         } catch (err) {
-            await client.query('ROLLBACK');
-            console.error(`❌ Failed to apply ${file}:`, err);
-            process.exit(1);
+          await client.query('ROLLBACK');
+          console.error(`❌ Failed to apply ${file}:`, err);
+          process.exit(1);
         }
       }
     }

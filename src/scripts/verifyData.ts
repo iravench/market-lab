@@ -5,7 +5,7 @@ const symbol = process.argv[2] || 'CBA.AX';
 async function verify() {
   console.log(`📊 Data Stats for ${symbol}:`);
   const client = await pool.connect();
-  
+
   try {
     // 1. Check total count and date range per interval
     const summary = await client.query(`

@@ -8,14 +8,14 @@ import { Candle } from '../types';
  * @param period The window size
  */
 export function calculateSMA(values: number[], period: number): (number | null)[] {
-    if (period <= 0) return values.map(() => null);
-    
-    return values.map((_, index) => {
-        const start = index - period + 1;
-        if (start < 0) return null; // Not enough data points yet
-        
-        const window = values.slice(start, index + 1);
-        const sum = window.reduce((acc, val) => acc + val, 0);
-        return sum / period;
-    });
+  if (period <= 0) return values.map(() => null);
+
+  return values.map((_, index) => {
+    const start = index - period + 1;
+    if (start < 0) return null; // Not enough data points yet
+
+    const window = values.slice(start, index + 1);
+    const sum = window.reduce((acc, val) => acc + val, 0);
+    return sum / period;
+  });
 }

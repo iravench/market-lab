@@ -8,5 +8,5 @@ import { exponentialMovingAverage } from './smoothing';
  * @param period Window size
  */
 export function calculateEMA(values: number[], period: number): (number | null)[] {
-    return exponentialMovingAverage(values, period);
+  return exponentialMovingAverage(values, period);
 }
