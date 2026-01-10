@@ -51,8 +51,9 @@ The system is composed of three decoupled domains:
 * [x] **Indicators:** Implement ATR, ADX, MACD, Bollinger Bands.
 * [x] **Risk Engine:** Implement Volatility-Adjusted Sizing (Risk Unit).
 * [x] **Defensive Logic:** Implement Chandelier Exits (ATR Trailing Stops).
-* [ ] **Regime Detection:** Filter trades based on ADX (Trend vs Chop).
-* [ ] **Portfolio Guard:** Implement Correlation checks and Daily Loss Limits.
+* [x] **Regime Detection:** Filter trades based on ADX (Trend vs Chop).
+* [x] **Portfolio Guard:** Implement Daily Loss Limits.
+* [ ] **Portfolio Guard:** Implement Correlation checks.
 * [ ] **Goal:** A robust, professional-grade system that prioritizes capital preservation.
 
 ## 5. Getting Started
