@@ -1,4 +1,5 @@
 import { Candle, IndicatorResult } from '../types';
+import { wildersSmoothing } from './smoothing';
 
 /**
  * Calculates the Average True Range (ATR).
@@ -12,7 +13,6 @@ export function calculateATR(candles: Candle[], period: number): IndicatorResult
     if (candles.length === 0) return [];
     if (period <= 0) return candles.map(() => null);
 
-    const atrArray: IndicatorResult[] = [];
     const trueRanges: number[] = [];
 
     // 1. Calculate True Range (TR) for each candle
@@ -33,25 +33,5 @@ export function calculateATR(candles: Candle[], period: number): IndicatorResult
     }
 
     // 2. Calculate ATR using Wilder's Smoothing
-    let prevATR = 0;
-    for (let i = 0; i < candles.length; i++) {
-        if (i < period - 1) {
-            atrArray.push(null);
-        } else if (i === period - 1) {
-            // First ATR is the simple average of TRs over the period
-            let sumTR = 0;
-            for (let j = 0; j <= i; j++) {
-                sumTR += trueRanges[j];
-            }
-            prevATR = sumTR / period;
-            atrArray.push(prevATR);
-        } else {
-            // Subsequent ATR = ((Prev ATR * (period - 1)) + Current TR) / period
-            const currentATR = ((prevATR * (period - 1)) + trueRanges[i]) / period;
-            atrArray.push(currentATR);
-            prevATR = currentATR;
-        }
-    }
-
-    return atrArray;
+    return wildersSmoothing(trueRanges, period);
 }
