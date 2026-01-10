@@ -126,4 +126,96 @@ describe('RiskManager', () => {
     };
     expect(riskManager.checkExits(candleHitShort, shortPos)).toBe('TAKE_PROFIT');
   });
+
+  it('should detect trending vs choppy markets (Regime Detection)', () => {
+    const configWithAdx: RiskConfig = {
+      ...defaultConfig,
+      adxThreshold: 25,
+      adxPeriod: 14
+    };
+    const rm = new RiskManager(configWithAdx);
+
+    // Create 40 trending candles
+    const trendingCandles: Candle[] = [];
+    for (let i = 0; i < 40; i++) {
+      trendingCandles.push({
+        time: new Date(2024, 0, i + 1),
+        open: 100 + i,
+        high: 102 + i,
+        low: 99 + i,
+        close: 101 + i,
+        volume: 1000
+      });
+    }
+    // High ADX (Trending)
+    expect(rm.isMarketTrending(trendingCandles)).toBe(true);
+
+    // Create 40 choppy candles
+    const choppyCandles: Candle[] = [];
+    for (let i = 0; i < 40; i++) {
+      choppyCandles.push({
+        time: new Date(2024, 0, i + 1),
+        open: 100,
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 1000
+      });
+    }
+    // Low ADX (Choppy)
+    expect(rm.isMarketTrending(choppyCandles)).toBe(false);
+  });
+
+  it('should detect daily loss limit breach (Portfolio Guard)', () => {
+    const configWithDLL: RiskConfig = {
+      ...defaultConfig,
+      dailyLossLimitPct: 0.02 // 2%
+    };
+    const rm = new RiskManager(configWithDLL);
+    const equity = 10000;
+    const today = new Date('2024-01-10T00:00:00Z');
+
+    // 1. One losing trade today (-150 = 1.5%) -> OK
+    const tradesOk = [
+      {
+        timestamp: new Date('2024-01-10T10:00:00Z'),
+        action: 'SELL' as const,
+        price: 90,
+        quantity: 10,
+        fee: 5,
+        totalValue: 900,
+        realizedPnL: -150
+      }
+    ];
+    expect(rm.checkDailyLoss(tradesOk, equity, today)).toBe(false);
+
+    // 2. Multiple losing trades today (-250 = 2.5%) -> BREACH
+    const tradesBreach = [
+      ...tradesOk,
+      {
+        timestamp: new Date('2024-01-10T14:00:00Z'),
+        action: 'SELL' as const,
+        price: 85,
+        quantity: 5,
+        fee: 5,
+        totalValue: 425,
+        realizedPnL: -100
+      }
+    ];
+    expect(rm.checkDailyLoss(tradesBreach, equity, today)).toBe(true);
+
+    // 3. Heavy loss but yesterday -> OK
+    const tradesYesterday = [
+      {
+        timestamp: new Date('2024-01-09T10:00:00Z'),
+        action: 'SELL' as const,
+        price: 80,
+        quantity: 100,
+        fee: 5,
+        totalValue: 8000,
+        realizedPnL: -1000
+      }
+    ];
+    expect(rm.checkDailyLoss(tradesYesterday, equity, today)).toBe(false);
+  });
 });

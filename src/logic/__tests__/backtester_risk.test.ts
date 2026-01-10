@@ -102,4 +102,83 @@ describe('Backtester with Risk Management', () => {
     const pos = portfolio.getState().positions.get('AAPL');
     expect(pos?.stopLoss).toBeCloseTo(96.66, 1);
   });
+
+  it('should filter trades in choppy markets (Low ADX)', () => {
+    // Config with high ADX threshold
+    const regimeConfig: RiskConfig = { ...riskConfig, adxThreshold: 50 };
+    const portfolio = new Portfolio(10000);
+    const strategy = new MockStrategy();
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', regimeConfig);
+
+    // ADX requires 2 * period - 1 to start. Period 14 -> 27 candles.
+    // Let's create 40 candles.
+    const choppyCandles: Candle[] = [];
+    for (let i = 0; i < 40; i++) {
+      choppyCandles.push({
+        time: new Date(2023, 0, i + 1),
+        open: 100, high: 101, low: 99, close: 100, volume: 1000
+      });
+    }
+
+    // Trigger BUY on last candle
+    strategy.analyze = (c) => {
+      if (c.length === 40) return { action: 'BUY', price: 100, timestamp: c[39].time };
+      return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
+    };
+
+    const result = backtester.run(choppyCandles);
+
+    // Should result in 0 trades because ADX is low
+    expect(result.trades.length).toBe(0);
+  });
+
+  it('should trigger Daily Loss Limit', () => {
+    // Config: 2% Daily Loss Limit ($200 on $10000)
+    // Relax Max Drawdown to 50% so we don't hit the hard stop first
+    const dllConfig: RiskConfig = { ...riskConfig, dailyLossLimitPct: 0.02, maxDrawdownPct: 0.5 };
+    const portfolio = new Portfolio(10000);
+    const strategy = new MockStrategy();
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', dllConfig);
+
+    // Day 1: 3 candles.
+    // 1. Buy.
+    // 2. Sell at huge loss.
+    // 3. Try to Buy again (Should be blocked).
+    const baseDate = new Date('2023-01-01T00:00:00Z');
+    const candles: Candle[] = [
+      { time: new Date(baseDate.getTime() + 0 * 3600000), open: 100, high: 100, low: 100, close: 100, volume: 1000 },
+      { time: new Date(baseDate.getTime() + 1 * 3600000), open: 100, high: 100, low: 100, close: 100, volume: 1000 }, // Buy
+      { time: new Date(baseDate.getTime() + 2 * 3600000), open: 100, high: 100, low: 70, close: 70, volume: 1000 },  // Sell
+      { time: new Date(baseDate.getTime() + 3 * 3600000), open: 70, high: 70, low: 70, close: 70, volume: 1000 },     // Try Buy
+    ];
+
+    // Force sizing to ensure we hit the loss limit
+    // If we risk 1% ($100), and stop is 2xATR (ATR ~0 due to flat candles?), let's manipulate execution.
+    // Actually, let's just use the mock strategy to force trades.
+
+    let tradeCount = 0;
+    strategy.analyze = (c) => {
+      const idx = c.length - 1;
+      // Candle 1: BUY
+      if (idx === 1) return { action: 'BUY', price: 100, timestamp: c[idx].time };
+      // Candle 2: SELL (Realize Loss)
+      if (idx === 2) return { action: 'SELL', price: 70, timestamp: c[idx].time };
+      // Candle 3: BUY (Should be blocked)
+      if (idx === 3) return { action: 'BUY', price: 70, timestamp: c[idx].time };
+      return { action: 'HOLD', price: c[idx].close, timestamp: c[idx].time };
+    };
+
+    const result = backtester.run(candles);
+
+    // We expect:
+    // Trade 1: Buy @ 100
+    // Trade 2: Sell @ 70 (Loss of 30 per share. If qty > 7, loss > $200)
+    // Trade 3: Blocked.
+    
+    // Check realized loss
+    const trades = result.trades;
+    expect(trades.length).toBe(2); // Buy + Sell. No second buy.
+    expect(trades[1].action).toBe('SELL');
+    expect(trades[1].realizedPnL).toBeLessThan(-200); // Confirm we actually lost enough
+  });
 });

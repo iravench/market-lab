@@ -27,6 +27,9 @@ export interface RiskConfig {
   atrMultiplier: number;   // for stops (e.g. 2.0)
   atrPeriod: number;       // typically 14
   trailingStop: boolean;
+  adxThreshold?: number;    // Regime Detection (default 25)
+  adxPeriod?: number;       // Regime Detection (default 14)
+  dailyLossLimitPct?: number; // Portfolio Guard (e.g. 0.02 for 2%)
 }
 
 /**

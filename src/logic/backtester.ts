@@ -43,6 +43,10 @@ export class Backtester {
     let atrSeries: (number | null)[] = [];
     let highWaterMark = initialCapital;
 
+    // Daily Loss Limit Tracking
+    let lastDateStr = '';
+    let dailyStartingEquity = initialCapital;
+
     // Pre-calculate ATR if Risk Manager is enabled
     if (this.riskManager) {
       const period = this.riskManager.config.atrPeriod || 14;
@@ -52,6 +56,33 @@ export class Backtester {
     // Main Simulation Loop
     for (let i = 0; i < candles.length; i++) {
       const currentCandle = candles[i];
+
+      // Daily starting equity update
+      const currentDateStr = currentCandle.time.toISOString().split('T')[0];
+      if (currentDateStr !== lastDateStr) {
+        dailyStartingEquity = this.portfolio.getTotalValue(currentCandle.open, this.symbol);
+        lastDateStr = currentDateStr;
+      }
+
+      // 0. Check Portfolio Guard: Daily Loss Limit
+      if (this.riskManager && this.riskManager.config.dailyLossLimitPct) {
+        const trades = this.portfolio.getState().trades;
+        if (this.riskManager.checkDailyLoss(trades, dailyStartingEquity, currentCandle.time)) {
+          const position = this.portfolio.getState().positions.get(this.symbol);
+          if (position) {
+            // Liquidate position if daily loss limit hit
+            const execPrice = this.slippageModel.calculateExecutionPrice(currentCandle.close, position.quantity, currentCandle, 'SELL');
+            this.portfolio.sell(this.symbol, {
+              action: 'SELL',
+              price: execPrice,
+              timestamp: currentCandle.time,
+              reason: 'DAILY_LOSS_LIMIT'
+            });
+          }
+          this.recordSnapshot(currentCandle, equityCurve);
+          continue; // Skip further signals today
+        }
+      }
 
       // 0a. Check Max Drawdown
       if (this.riskManager) {
@@ -115,6 +146,14 @@ export class Backtester {
 
       // 2. Enhance Signal with Quantity / Risk Params / Slippage
       const finalSignal: Signal = { ...rawSignal };
+
+      // Regime Detection (ADX Filter)
+      if (this.riskManager && finalSignal.action === 'BUY') {
+        if (!this.riskManager.isMarketTrending(visibleHistory)) {
+          finalSignal.action = 'HOLD';
+          finalSignal.reason = 'Market is choppy (Low ADX)';
+        }
+      }
 
       if (finalSignal.action !== 'HOLD') {
         // Apply Slippage to Entry/Exit Signal

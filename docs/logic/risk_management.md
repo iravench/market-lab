@@ -20,10 +20,13 @@ Static stop losses (e.g., "sell if down 5%") are brittle; they often trigger pre
 *   **ATR Trailing Stop:** A dynamic stop-loss that "ratchets" upwards as the price moves in the trade's favor.
 *   **Why:** It creates a "one-way valve" for profit accumulation. It allows winning trades to run (Slow) while cutting losing trades or reversals quickly (Fast) based on statistical volatility rather than arbitrary percentages.
 
-## 3. Market Regime Filtering
+## 3. Market Regime Filtering (Implemented)
 Strategies that work well in trending markets often fail in chopping (sideways) markets, and vice-versa. Applying the wrong strategy to the wrong environment is a primary source of drawdown.
 
-*   **Trend vs. Chop (ADX):** Using the Average Directional Index to classify the market state. Trend-following strategies are disabled during low-ADX "chop" regimes to prevent "death by a thousand cuts."
+*   **Trend vs. Chop (ADX - Implemented):** 
+    *   **Mechanism:** Before accepting a `BUY` signal, the Risk Manager calculates the Average Directional Index (ADX) over the last 14 periods.
+    *   **Threshold:** If `ADX < 25`, the market is classified as "Choppy" or "Range-Bound."
+    *   **Action:** The trade is **rejected** (signal forced to `HOLD`). This prevents trend-following strategies from getting "chopped up" in directionless markets.
 *   **Volatility States (Bollinger Bands):** Identifying periods of extreme compression ("Squeezes") or expansion to filter entries.
 *   **Momentum Validation (MACD):** ensuring that price breakouts are supported by underlying momentum, filtering out "bull traps."
 
@@ -32,7 +35,10 @@ Individual trades may be safe, but a collection of correlated trades can be fata
 
 *   **Correlation Limits:** Preventing the portfolio from becoming accidentally concentrated in a single sector or factor by rejecting new positions that are highly correlated with existing holdings.
 *   **Hard Stops (Circuit Breakers):**
-    *   **Daily Loss Limit:** A cooling-off mechanism to halt trading if a single session's losses exceed a threshold, preventing "revenge trading" spirals.
+    *   **Daily Loss Limit (Implemented):**
+        *   **Concept:** A cooling-off mechanism to halt trading if a single session's losses exceed a threshold (e.g., 2% of Equity).
+        *   **Mechanism:** The Risk Manager sums the Realized PnL of all trades closed on the current day.
+        *   **Action:** If `Daily Loss > Limit`, the system enters a **Liquidate Only** mode for the remainder of the day. All open positions are closed, and new entries are blocked. This prevents "revenge trading" spirals.
     *   **Max Drawdown Hard Stop:** A permanent system disablement if equity falls below a critical level, acknowledging that the current edge may be broken.
 
 ## 5. Execution Risk & Slippage

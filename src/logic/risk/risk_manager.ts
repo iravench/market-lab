@@ -1,4 +1,5 @@
-import { Candle, Position, RiskConfig, SignalAction } from '../types';
+import { Candle, Position, RiskConfig, SignalAction, Trade } from '../types';
+import { calculateADX } from '../indicators/adx';
 
 export class RiskManager {
   public config: RiskConfig;
@@ -105,5 +106,45 @@ export class RiskManager {
     }
 
     return null;
+  }
+
+  /**
+   * Regime Detection: Checks if the market is trending based on ADX.
+   * If ADX is below the threshold, the market is "choppy".
+   */
+  public isMarketTrending(candles: Candle[]): boolean {
+    const threshold = this.config.adxThreshold ?? 25;
+    const period = this.config.adxPeriod ?? 14;
+
+    if (candles.length < period * 2) return true; // Not enough data, assume trending to avoid blocking signals prematurely
+
+    const adxValues = calculateADX(candles, period);
+    const currentAdx = adxValues[adxValues.length - 1];
+
+    if (currentAdx === null) return true;
+
+    return currentAdx >= threshold;
+  }
+
+  /**
+   * Portfolio Guard: Checks if the daily loss limit has been breached.
+   * @param trades List of all trades
+   * @param startingEquity Equity at the start of the current day
+   * @param today Date representing the current day
+   */
+  public checkDailyLoss(trades: Trade[], startingEquity: number, today: Date): boolean {
+    if (!this.config.dailyLossLimitPct || startingEquity <= 0) return false;
+
+    const todayStr = today.toISOString().split('T')[0];
+    
+    // Calculate total realized PnL for today
+    const dailyPnL = trades
+      .filter(t => t.timestamp.toISOString().split('T')[0] === todayStr)
+      .reduce((sum, t) => sum + (t.realizedPnL || 0), 0);
+
+    const dailyReturnPct = dailyPnL / startingEquity;
+
+    // Breach if loss (negative return) is more than the limit
+    return dailyReturnPct <= -this.config.dailyLossLimitPct;
   }
 }
