@@ -33,7 +33,11 @@ Strategies that work well in trending markets often fail in chopping (sideways) 
 ## 4. Portfolio & Systemic Risk
 Individual trades may be safe, but a collection of correlated trades can be fatal.
 
-*   **Correlation Limits:** Preventing the portfolio from becoming accidentally concentrated in a single sector or factor by rejecting new positions that are highly correlated with existing holdings.
+*   **Correlation Limits (Planned/In-Progress):** 
+    *   **Problem:** If the portfolio holds 10 stocks that are all highly correlated (e.g., all Tech stocks), diversification is an illusion. A crash in that sector destroys the entire account.
+    *   **Mechanism:** Before entering a new trade, calculate the **Pearson Correlation Coefficient** between the candidate asset and *every* existing holding over the last N periods (e.g., 30 days).
+    *   **Threshold:** If Correlation > 0.7 (or < -0.7 for hedging) with *any* existing position, the new trade is blocked.
+    *   **Goal:** Force the system to find alpha in uncorrelated assets (Energy, Metals, Utilities), ensuring true diversification.
 *   **Hard Stops (Circuit Breakers):**
     *   **Daily Loss Limit (Implemented):**
         *   **Concept:** A cooling-off mechanism to halt trading if a single session's losses exceed a threshold (e.g., 2% of Equity).
