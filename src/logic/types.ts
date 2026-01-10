@@ -16,6 +16,15 @@ export interface Signal {
     price: number;
     timestamp: Date;
     reason?: string;
+    stopLoss?: number;
+    takeProfit?: number;
+}
+
+export interface RiskConfig {
+    riskPerTradePct: number; // e.g. 0.01 for 1%
+    maxDrawdownPct: number;  // e.g. 0.1 for 10%
+    atrMultiplier: number;   // for stops (e.g. 2.0)
+    trailingStop: boolean;
 }
 
 /**
@@ -41,6 +50,8 @@ export interface Position {
     symbol: string;
     quantity: number;
     averagePrice: number;
+    stopLoss?: number;
+    takeProfit?: number;
 }
 
 export interface PortfolioState {
