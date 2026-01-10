@@ -218,4 +218,28 @@ describe('RiskManager', () => {
     ];
     expect(rm.checkDailyLoss(tradesYesterday, equity, today)).toBe(false);
   });
+
+  it('should detect correlation breach', () => {
+    const configWithCorr: RiskConfig = {
+      ...defaultConfig,
+      maxCorrelation: 0.8
+    };
+    const rm = new RiskManager(configWithCorr);
+
+    // Candidate: [1%, 2%, 3%, 4%, 5%]
+    const candidateReturns = [0.01, 0.02, 0.03, 0.04, 0.05];
+
+    // Existing Position A: Highly correlated (almost identical)
+    // [1.1%, 2.1%, 3.1%, 4.1%, 5.1%] -> Corr 1.0
+    const portfolioReturns = new Map<string, number[]>();
+    portfolioReturns.set('AAPL', [0.011, 0.021, 0.031, 0.041, 0.051]);
+
+    expect(rm.checkCorrelation(candidateReturns, portfolioReturns)).toBe(true); // Breach > 0.8
+
+    // Existing Position B: Uncorrelated
+    const portfolioUncorrelated = new Map<string, number[]>();
+    portfolioUncorrelated.set('GLD', [0.05, 0.04, 0.03, 0.02, 0.01]); // Negative correlation
+
+    expect(rm.checkCorrelation(candidateReturns, portfolioUncorrelated)).toBe(false); // No Breach
+  });
 });

@@ -1,5 +1,6 @@
 import { Candle, Position, RiskConfig, SignalAction, Trade } from '../types';
 import { calculateADX } from '../indicators/adx';
+import { calculateCorrelation } from '../math';
 
 export class RiskManager {
   public config: RiskConfig;
@@ -146,5 +147,29 @@ export class RiskManager {
 
     // Breach if loss (negative return) is more than the limit
     return dailyReturnPct <= -this.config.dailyLossLimitPct;
+  }
+
+  /**
+   * Portfolio Guard: Correlation Check.
+   * Checks if the candidate asset is highly correlated with any existing position.
+   * 
+   * @param candidateReturns Array of percentage returns for the candidate asset
+   * @param portfolioReturns Map of symbol -> array of percentage returns for existing positions
+   * @returns true if correlation limit is breached (i.e. too correlated)
+   */
+  public checkCorrelation(
+    candidateReturns: number[],
+    portfolioReturns: Map<string, number[]>
+  ): boolean {
+    const limit = this.config.maxCorrelation || 0.7;
+
+    for (const [symbol, existingReturns] of portfolioReturns) {
+      const correlation = calculateCorrelation(candidateReturns, existingReturns);
+      if (correlation > limit) {
+        return true; // Breached
+      }
+    }
+
+    return false;
   }
 }

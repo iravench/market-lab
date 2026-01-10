@@ -53,7 +53,7 @@ The system is composed of three decoupled domains:
 * [x] **Defensive Logic:** Implement Chandelier Exits (ATR Trailing Stops).
 * [x] **Regime Detection:** Filter trades based on ADX (Trend vs Chop).
 * [x] **Portfolio Guard:** Implement Daily Loss Limits.
-* [ ] **Portfolio Guard:** Implement Correlation checks.
+* [ ] **Portfolio Guard:** Implement Correlation checks (Logic Implemented, Data Layer Pending).
 * [ ] **Goal:** A robust, professional-grade system that prioritizes capital preservation.
 
 ## 5. Getting Started
