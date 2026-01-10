@@ -86,3 +86,59 @@ $$ ATR_t = \frac{(ATR_{prev} \times (N-1)) + TR_t}{N} $$
 *   **Stop Loss Placement:** Setting a stop loss at $2 \times ATR$ below entry ensures the stop is outside the "noise" of normal volatility.
 *   **Volatility-Adjusted Sizing:** Reducing position size when ATR is high and increasing it when ATR is low keeps dollar-risk constant.
 *   **Regime Detection:** Expanding ATR suggests a breakout or increased market stress; contracting ATR suggests consolidation.
+
+---
+
+## 5. Average Directional Index (ADX)
+
+### What is it?
+The ADX is used to quantify **trend strength**. It does not indicate trend direction, only whether a strong trend (of any direction) is present.
+
+### The Math
+1.  **Directional Movement (DM):**
+    *   $+DM = High_{now} - High_{prev}$ (if $> 0$ and $> Low_{prev} - Low_{now}$, else $0$)
+    *   $-DM = Low_{prev} - Low_{now}$ (if $> 0$ and $> High_{now} - High_{prev}$, else $0$)
+2.  **Directional Indicators (DI):**
+    *   $+DI = 100 \times \frac{Smoothed +DM}{ATR}$
+    *   $-DI = 100 \times \frac{Smoothed -DM}{ATR}$
+3.  **Directional Index (DX):**
+    *   $DX = 100 \times \frac{|+DI - -DI|}{+DI + -DI}$
+4.  **ADX:** The smoothed average of $DX$.
+
+### How to use it
+*   **Trend Strength:** ADX > 25 indicates a strong trend. ADX < 20 indicates a weak trend or "chop."
+*   **Filter:** Only execute trend-following strategies when ADX > 25.
+
+---
+
+## 6. Moving Average Convergence Divergence (MACD)
+
+### What is it?
+MACD is a **trend-following momentum indicator** that shows the relationship between two EMAs of an asset’s price.
+
+### The Math
+1.  **MACD Line:** $12\text{-period EMA} - 26\text{-period EMA}$
+2.  **Signal Line:** $9\text{-period EMA}$ of the MACD Line.
+3.  **Histogram:** $\text{MACD Line} - \text{Signal Line}$
+
+### How to use it
+*   **Momentum Validation:** If price is rising but MACD Histogram is falling (Divergence), the trend may be weakening.
+*   **Crossovers:** MACD Line crossing above the Signal Line is a bullish signal.
+
+---
+
+## 7. Bollinger Bands
+
+### What is it?
+Bollinger Bands consist of a middle band (SMA) and two outer bands that are standard deviations away from the SMA.
+
+### The Math
+1.  **Middle Band:** $N\text{-period SMA}$
+2.  **Upper Band:** $SMA + (k \times \sigma)$
+3.  **Lower Band:** $SMA - (k \times \sigma)$
+    *   $\sigma$ = Standard Deviation of price over $N$ periods.
+    *   $k$ = Multiplier (typically 2).
+
+### How to use it
+*   **Volatility Squeeze:** When bands are very thin, it indicates low volatility and often precedes a major price breakout.
+*   **Overextended:** Prices touching or exceeding the outer bands are statistically overextended and may revert to the mean.
