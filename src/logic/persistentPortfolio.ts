@@ -36,7 +36,7 @@ export class PersistentPortfolio extends Portfolio {
 
             // 2. Load Positions
             const resPos = await client.query(
-                `SELECT symbol, quantity, average_price FROM positions WHERE portfolio_id = $1`,
+                `SELECT symbol, quantity, average_price, stop_loss, take_profit FROM positions WHERE portfolio_id = $1`,
                 [this.portfolioId]
             );
 
@@ -45,7 +45,9 @@ export class PersistentPortfolio extends Portfolio {
                 positionsMap.set(row.symbol, {
                     symbol: row.symbol,
                     quantity: parseFloat(row.quantity),
-                    averagePrice: parseFloat(row.average_price)
+                    averagePrice: parseFloat(row.average_price),
+                    stopLoss: row.stop_loss ? parseFloat(row.stop_loss) : undefined,
+                    takeProfit: row.take_profit ? parseFloat(row.take_profit) : undefined
                 });
             }
             this.positions = positionsMap;
@@ -107,6 +109,25 @@ export class PersistentPortfolio extends Portfolio {
         }
     }
 
+    public async updateRiskParams(symbol: string, stopLoss?: number, takeProfit?: number): Promise<void> {
+        const client = await pool.connect();
+        try {
+            await client.query(
+                `UPDATE positions SET stop_loss = $1, take_profit = $2, updated_at = NOW() 
+                 WHERE portfolio_id = $3 AND symbol = $4`,
+                [stopLoss || null, takeProfit || null, this.portfolioId, symbol]
+            );
+            // Refresh in-memory state
+            const pos = this.positions.get(symbol);
+            if (pos) {
+                pos.stopLoss = stopLoss;
+                pos.takeProfit = takeProfit;
+            }
+        } finally {
+            client.release();
+        }
+    }
+
     private async persistBuy(client: PoolClient, symbol: string, signal: Signal) {
         const { price, timestamp, quantity, stopLoss, takeProfit } = signal;
 
@@ -162,18 +183,18 @@ export class PersistentPortfolio extends Portfolio {
             newAvgPrice = totalCostBasis / newQty;
 
             await client.query(
-                `UPDATE positions SET quantity = $1, average_price = $2, updated_at = NOW() 
-                 WHERE portfolio_id = $3 AND symbol = $4`,
-                [newQty, newAvgPrice, this.portfolioId, symbol]
+                `UPDATE positions SET quantity = $1, average_price = $2, stop_loss = $3, take_profit = $4, updated_at = NOW() 
+                 WHERE portfolio_id = $5 AND symbol = $6`,
+                [newQty, newAvgPrice, stopLoss || null, takeProfit || null, this.portfolioId, symbol]
             );
         } else {
              // Initial cost basis per share = Total Cost / Qty
              newAvgPrice = totalCost / finalQuantity;
              
              await client.query(
-                `INSERT INTO positions (portfolio_id, symbol, quantity, average_price)
-                 VALUES ($1, $2, $3, $4)`,
-                [this.portfolioId, symbol, finalQuantity, newAvgPrice]
+                `INSERT INTO positions (portfolio_id, symbol, quantity, average_price, stop_loss, take_profit)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [this.portfolioId, symbol, finalQuantity, newAvgPrice, stopLoss || null, takeProfit || null]
              );
         }
 
