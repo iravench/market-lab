@@ -3,6 +3,7 @@ import { Backtester } from '../logic/backtester';
 import { Portfolio } from '../logic/portfolio';
 import { RsiStrategy } from '../logic/strategies/rsiStrategy';
 import { RiskConfig } from '../logic/types';
+import { FixedPercentageSlippage } from '../logic/slippage';
 import pool from '../db';
 
 async function main() {
@@ -45,7 +46,9 @@ async function main() {
             trailingStop: true
         };
 
-        const backtester = new Backtester(strategy, portfolio, symbol, riskConfig);
+        const slippageModel = new FixedPercentageSlippage(0.001); // 0.1% slippage
+
+        const backtester = new Backtester(strategy, portfolio, symbol, riskConfig, slippageModel);
 
         // 3. Run Simulation
         const result = backtester.run(candles);
