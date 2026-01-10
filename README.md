@@ -38,6 +38,14 @@ The system is composed of three decoupled domains:
 *   [x] Build a scheduler to run strategies on live data intervals (via CLI automation).
 *   [x] **Goal:** A "bot" that trades in real-time with fake money.
 
+### Phase 5: Risk Management & Sophistication (Current)
+*   [ ] **Indicators:** Implement ATR, ADX, MACD, Bollinger Bands.
+*   [ ] **Risk Engine:** Implement Volatility-Adjusted Sizing (Risk Unit).
+*   [ ] **Defensive Logic:** Implement Chandelier Exits (ATR Trailing Stops).
+*   [ ] **Regime Detection:** Filter trades based on ADX (Trend vs Chop).
+*   [ ] **Portfolio Guard:** Implement Correlation checks and Daily Loss Limits.
+*   [ ] **Goal:** A robust, professional-grade system that prioritizes capital preservation.
+
 ## 5. Getting Started
 
 ### Prerequisites
