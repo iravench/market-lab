@@ -35,5 +35,18 @@ Individual trades may be safe, but a collection of correlated trades can be fata
     *   **Daily Loss Limit:** A cooling-off mechanism to halt trading if a single session's losses exceed a threshold, preventing "revenge trading" spirals.
     *   **Max Drawdown Hard Stop:** A permanent system disablement if equity falls below a critical level, acknowledging that the current edge may be broken.
 
-## 5. Execution Risk
-*   **Slippage & Liquidity:** Acknowledging that "Paper Prices" are not "Real Prices." The system models friction (slippage) and enforces liquidity floors to ensure the simulated performance is attainable in reality.
+## 5. Execution Risk & Slippage
+Acknowledging that "Paper Prices" are not "Real Prices." The system simulates friction (slippage) to ensure performance metrics are realistic.
+
+### 5.1 Fixed Percentage Slippage
+*   **Concept:** Assumes every trade executes at a price slightly worse than the theoretical signal price.
+*   **Formula:**
+    *   Buy Price = $Price \times (1 + \text{Slippage \%})$
+    *   Sell Price = $Price \times (1 - \text{Slippage \%})$
+*   **Rationale:** Represents standard market spread and fees not captured by the broker model.
+
+### 5.2 Volatility-Based Slippage
+*   **Concept:** Slippage is not constant; it increases when the market is volatile (wide spreads, fast movement).
+*   **Formula:** Execution Price = $Price \pm (\text{Candle Range} \times \text{Factor})$
+    *   Where Candle Range = High - Low.
+*   **Rationale:** During a crash (high volatility), liquidity dries up, and you are more likely to get filled far from your stop price. This model penalizes trading during chaos.
