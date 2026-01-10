@@ -6,6 +6,7 @@ describe('RiskManager', () => {
         riskPerTradePct: 0.01, // 1%
         maxDrawdownPct: 0.1,   // 10%
         atrMultiplier: 2.0,
+        atrPeriod: 14,
         trailingStop: true
     };
 
