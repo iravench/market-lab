@@ -1,3 +1,5 @@
+import { wildersSmoothing } from './smoothing';
+
 /**
  * Calculates the Relative Strength Index (RSI).
  * Uses Wilder's Smoothing technique.
@@ -10,53 +12,48 @@ export function calculateRSI(values: number[], period: number = 14): (number | n
         return values.map(() => null);
     }
 
+    // 1. Calculate Gains and Losses
+    // Note: changes[i] corresponds to price at values[i+1]
+    const gains: number[] = [];
+    const losses: number[] = [];
+
+    for (let i = 1; i < values.length; i++) {
+        const change = values[i] - values[i - 1];
+        if (change > 0) {
+            gains.push(change);
+            losses.push(0);
+        } else {
+            gains.push(0);
+            losses.push(Math.abs(change));
+        }
+    }
+
+    // 2. Smooth Gains and Losses
+    const avgGains = wildersSmoothing(gains, period);
+    const avgLosses = wildersSmoothing(losses, period);
+
+    // 3. Calculate RSI
     const rsiArray: (number | null)[] = [];
     
-    // 1. Calculate Changes (Diff)
-    const changes: number[] = [];
-    for (let i = 1; i < values.length; i++) {
-        changes.push(values[i] - values[i - 1]);
-    }
+    // Align with original values array
+    // The first price (index 0) has no change, so it's always null.
+    rsiArray.push(null);
 
-    // Arrays to hold the running averages
-    let avgGain = 0;
-    let avgLoss = 0;
+    for (let i = 0; i < avgGains.length; i++) {
+        const gain = avgGains[i];
+        const loss = avgLosses[i];
 
-    // 2. Initial Calculation (Simple Average for the first 'period')
-    // Note: We need 'period' amount of changes, which means 'period + 1' amount of prices.
-    for (let i = 0; i < period; i++) {
-        const change = changes[i];
-        if (change > 0) avgGain += change;
-        else avgLoss += Math.abs(change);
-    }
-    
-    avgGain /= period;
-    avgLoss /= period;
-
-    // Fill the initial nulls (0 to period-1)
-    // The first RSI value is available at index 'period'
-    for (let i = 0; i < period; i++) {
-        rsiArray.push(null);
-    }
-
-    // Calculate first RSI
-    let rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
-    rsiArray.push(rsi);
-
-    // 3. Smooth Calculation for the rest
-    for (let i = period; i < changes.length; i++) {
-        const change = changes[i];
-        const currentGain = change > 0 ? change : 0;
-        const currentLoss = change < 0 ? Math.abs(change) : 0;
-
-        // Wilder's Smoothing Formula:
-        // ((Previous Avg * (N-1)) + Current) / N
-        avgGain = ((avgGain * (period - 1)) + currentGain) / period;
-        avgLoss = ((avgLoss * (period - 1)) + currentLoss) / period;
-
-        rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
-        
-        rsiArray.push(rsi);
+        if (gain === null || loss === null) {
+            rsiArray.push(null);
+        } else {
+            if (loss === 0) {
+                rsiArray.push(100);
+            } else {
+                const rs = gain / loss;
+                const rsi = 100 - (100 / (1 + rs));
+                rsiArray.push(rsi);
+            }
+        }
     }
 
     return rsiArray;
