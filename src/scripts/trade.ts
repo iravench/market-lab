@@ -5,6 +5,7 @@ import yahooFinance from 'yahoo-finance2';
 import { Candle, Signal, RiskConfig } from '../logic/types';
 import { RiskManager } from '../logic/risk/risk_manager';
 import { calculateATR } from '../logic/indicators/atr';
+import { FixedPercentageSlippage } from '../logic/slippage';
 
 async function main() {
     const args = process.argv.slice(2);
@@ -20,6 +21,9 @@ async function main() {
     console.log(`🤖 Starting Bot for ${symbol}`);
     console.log(`📂 Portfolio: ${portfolioId}`);
     console.log(`⚠️  Mode: ${mode.toUpperCase()}`);
+
+    // Execution Configuration
+    const slippageModel = new FixedPercentageSlippage(0.001); // 0.1% slippage
 
     // Risk Configuration
     const riskConfig: RiskConfig = {
@@ -81,9 +85,12 @@ async function main() {
             const exitReason = riskManager.checkExits(latestCandle, pos);
             if (exitReason) {
                 console.log(`🚨 RISK EXIT TRIGGERED: ${exitReason}`);
+                const basePrice = exitReason === 'STOP_LOSS' ? (pos.stopLoss || latestCandle.close) : (pos.takeProfit || latestCandle.close);
+                const execPrice = slippageModel.calculateExecutionPrice(basePrice, pos.quantity, latestCandle, 'SELL');
+                
                 finalSignal = {
                     action: 'SELL',
-                    price: exitReason === 'STOP_LOSS' ? (pos.stopLoss || latestCandle.close) : (pos.takeProfit || latestCandle.close),
+                    price: execPrice,
                     timestamp: latestCandle.time,
                     reason: `Risk Management: ${exitReason}`
                 };
@@ -114,6 +121,9 @@ async function main() {
             if (strategySignal.reason) console.log(`   Reason: ${strategySignal.reason}`);
 
             if (strategySignal.action === 'BUY') {
+                // Apply Slippage to Entry
+                const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, 0, latestCandle, 'BUY');
+
                 // Enhance BUY signal with Risk Unit sizing
                 const atrSeries = calculateATR(candles, riskConfig.atrPeriod);
                 const latestAtr = atrSeries[atrSeries.length - 1];
@@ -121,33 +131,35 @@ async function main() {
 
                 if (latestAtr) {
                     const stopLoss = riskManager.calculateATRStop(latestCandle.close, latestAtr, 'BUY');
-                    const quantity = riskManager.calculatePositionSize(equity, latestCandle.close, stopLoss);
+                    const quantity = riskManager.calculatePositionSize(equity, execPrice, stopLoss);
                     
                     finalSignal = {
                         ...strategySignal,
+                        price: execPrice,
                         quantity,
                         stopLoss
                     };
-                    console.log(`🛡️  Risk Sizing: Requested ${quantity} shares, Stop Loss: $${stopLoss.toFixed(2)}`);
+                    console.log(`🛡️  Risk Sizing: Requested ${quantity} shares @ $${execPrice.toFixed(2)}, Stop Loss: $${stopLoss.toFixed(2)}`);
                 } else {
                     console.warn('⚠️  Could not calculate ATR for sizing. Skipping BUY.');
                 }
             } else if (strategySignal.action === 'SELL') {
-                finalSignal = strategySignal;
+                const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, pos?.quantity || 0, latestCandle, 'SELL');
+                finalSignal = { ...strategySignal, price: execPrice };
             }
         }
 
         // 5. Execute Final Signal
         if (finalSignal && finalSignal.action !== 'HOLD') {
             if (isLive) {
-                console.log(`🚀 Executing LIVE ${finalSignal.action} trade...`);
+                console.log(`🚀 Executing LIVE ${finalSignal.action} trade @ $${finalSignal.price.toFixed(2)}...`);
                 await portfolio.executeSignal(finalSignal, symbol, 'RsiStrategy');
                 console.log('✅ Trade executed successfully.');
                 
                 const newState = portfolio.getState();
                 console.log(`💰 New Cash: $${newState.cash.toFixed(2)}`);
             } else {
-                console.log('🛑 DRY RUN: Trade NOT executed.');
+                console.log(`🛑 DRY RUN: ${finalSignal.action} Signal generated @ $${finalSignal.price.toFixed(2)}.`);
                 if (finalSignal.quantity) {
                     console.log(`   Simulated Quantity: ${finalSignal.quantity}`);
                 }
