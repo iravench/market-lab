@@ -1,7 +1,7 @@
 import { Candle, Position, RiskConfig, SignalAction } from '../types';
 
 export class RiskManager {
-    private config: RiskConfig;
+    public config: RiskConfig;
 
     constructor(config: RiskConfig) {
         this.config = config;
