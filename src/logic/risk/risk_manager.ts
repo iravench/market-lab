@@ -63,6 +63,22 @@ export class RiskManager {
     }
 
     /**
+     * Checks if the Maximum Drawdown limit has been breached.
+     * @param currentEquity Current total portfolio value
+     * @param highWaterMark Highest equity value seen so far
+     * @returns true if drawdown limit is breached
+     */
+    public checkDrawdown(currentEquity: number, highWaterMark: number): boolean {
+        if (highWaterMark <= 0) return false;
+        
+        const drawdown = (currentEquity - highWaterMark) / highWaterMark;
+        // maxDrawdownPct is positive (e.g. 0.1 for 10%)
+        // drawdown is negative (e.g. -0.15)
+        // Breach if drawdown < -maxDrawdownPct
+        return drawdown < -this.config.maxDrawdownPct;
+    }
+
+    /**
      * Checks if any risk-based exit conditions are met.
      */
     public checkExits(candle: Candle, position: Position): 'STOP_LOSS' | 'TAKE_PROFIT' | null {

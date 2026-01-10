@@ -12,9 +12,11 @@ export class Portfolio {
     protected positions: Map<string, Position>;
     protected trades: Trade[];
     protected commission: CommissionConfig;
+    public highWaterMark: number;
 
     constructor(initialCash: number, commission: Partial<CommissionConfig> = {}) {
         this.cash = initialCash;
+        this.highWaterMark = initialCash;
         this.positions = new Map();
         this.trades = [];
         this.commission = {

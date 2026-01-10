@@ -74,6 +74,26 @@ async function main() {
         const state = portfolio.getState();
         console.log(`💰 Cash: $${state.cash.toFixed(2)}`);
         
+        // 2a. Check Max Drawdown (Hard Stop)
+        const currentEquity = portfolio.getTotalValue(latestCandle.close, symbol);
+        console.log(`📈 Equity: $${currentEquity.toFixed(2)} (HWM: $${portfolio.highWaterMark.toFixed(2)})`);
+
+        if (currentEquity > portfolio.highWaterMark) {
+            console.log(`🎉 New High Water Mark! Updating DB...`);
+            if (isLive) {
+                await portfolio.persistHighWaterMark(currentEquity);
+            } else {
+                portfolio.highWaterMark = currentEquity;
+            }
+        }
+
+        if (riskManager.checkDrawdown(currentEquity, portfolio.highWaterMark)) {
+            console.error(`🛑 HARD STOP: Maximum Drawdown (${(riskConfig.maxDrawdownPct * 100).toFixed(1)}%) Breached.`);
+            console.error(`   Current Equity: $${currentEquity.toFixed(2)}, HWM: $${portfolio.highWaterMark.toFixed(2)}`);
+            console.error(`   Trading Halted.`);
+            process.exit(1);
+        }
+
         // 3. Risk Check: Check Exits for existing positions
         const pos = state.positions.get(symbol);
         let finalSignal: Signal | null = null;

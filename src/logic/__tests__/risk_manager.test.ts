@@ -12,6 +12,21 @@ describe('RiskManager', () => {
 
     const riskManager = new RiskManager(defaultConfig);
 
+    it('should detect max drawdown breach', () => {
+        // Config: maxDrawdownPct = 0.1 (10%)
+        const hwm = 10000;
+        
+        // Equity 9500 (5% drawdown) -> OK
+        expect(riskManager.checkDrawdown(9500, hwm)).toBe(false);
+        
+        // Equity 9000 (10% drawdown) -> OK (boundary)
+        // Implementation check: < -0.1. So -0.1 is NOT < -0.1.
+        expect(riskManager.checkDrawdown(9000, hwm)).toBe(false); 
+        
+        // Equity 8900 (11% drawdown) -> BREACH
+        expect(riskManager.checkDrawdown(8900, hwm)).toBe(true);
+    });
+
     it('should calculate position size correctly (Risk Unit)', () => {
         // Equity 10000, Risk 1% = 100.
         // Entry 100, Stop 95. Risk per share = 5.

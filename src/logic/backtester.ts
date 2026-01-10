@@ -41,6 +41,7 @@ export class Backtester {
         const initialCapital = this.portfolio.getState().cash;
         const equityCurve: EquitySnapshot[] = [];
         let atrSeries: (number | null)[] = [];
+        let highWaterMark = initialCapital;
 
         // Pre-calculate ATR if Risk Manager is enabled
         if (this.riskManager) {
@@ -52,7 +53,26 @@ export class Backtester {
         for (let i = 0; i < candles.length; i++) {
             const currentCandle = candles[i];
             
-            // 0. Risk Management: Check for existing position exits (Stop Loss / Take Profit)
+            // 0a. Check Max Drawdown
+            if (this.riskManager) {
+                const currentEquity = this.portfolio.getTotalValue(currentCandle.close, this.symbol);
+                if (currentEquity > highWaterMark) {
+                    highWaterMark = currentEquity;
+                }
+                
+                if (this.riskManager.checkDrawdown(currentEquity, highWaterMark)) {
+                    // HARD STOP: Maximum Drawdown Breached
+                    // We record the failure state and stop the simulation.
+                    this.recordSnapshot(currentCandle, equityCurve);
+                    
+                    // Technically we should liquidate positions to realize the loss, 
+                    // but for a Hard Stop analysis, knowing WHERE we died is enough.
+                    console.warn(`🛑 Max Drawdown Breached at ${currentCandle.time.toISOString()}. Equity: $${currentEquity.toFixed(2)}, HWM: $${highWaterMark.toFixed(2)}`);
+                    break; 
+                }
+            }
+
+            // 0b. Risk Management: Check for existing position exits (Stop Loss / Take Profit)
             if (this.riskManager) {
                 const position = this.portfolio.getState().positions.get(this.symbol);
                 if (position) {

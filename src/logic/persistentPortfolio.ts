@@ -20,7 +20,7 @@ export class PersistentPortfolio extends Portfolio {
         try {
             // 1. Load Cash
             const resPort = await client.query(
-                `SELECT current_cash FROM portfolios WHERE id = $1`, 
+                `SELECT current_cash, high_water_mark FROM portfolios WHERE id = $1`, 
                 [this.portfolioId]
             );
             
@@ -28,11 +28,8 @@ export class PersistentPortfolio extends Portfolio {
                 throw new Error(`Portfolio ${this.portfolioId} not found`);
             }
             
-            // Hack: access private property via 'any' or setter if we had one.
-            // Since we are extending, we can change 'private' to 'protected' in base class 
-            // OR just use this hack for now. 
-            // Let's refactor the base class to 'protected' in a moment for cleanliness.
             this.cash = parseFloat(resPort.rows[0].current_cash);
+            this.highWaterMark = resPort.rows[0].high_water_mark ? parseFloat(resPort.rows[0].high_water_mark) : this.cash;
 
             // 2. Load Positions
             const resPos = await client.query(
@@ -123,6 +120,19 @@ export class PersistentPortfolio extends Portfolio {
                 pos.stopLoss = stopLoss;
                 pos.takeProfit = takeProfit;
             }
+        } finally {
+            client.release();
+        }
+    }
+
+    public async persistHighWaterMark(value: number): Promise<void> {
+        const client = await pool.connect();
+        try {
+            await client.query(
+                `UPDATE portfolios SET high_water_mark = $1, updated_at = NOW() WHERE id = $2`,
+                [value, this.portfolioId]
+            );
+            this.highWaterMark = value;
         } finally {
             client.release();
         }
