@@ -11,7 +11,8 @@ describe('Portfolio', () => {
 
     it('should allow buying assets', () => {
         const portfolio = new Portfolio(10000);
-        portfolio.buy(SYMBOL, 100, new Date());
+        // Explicitly requesting 100 shares
+        portfolio.buy(SYMBOL, { action: 'BUY', price: 100, timestamp: new Date(), quantity: 100 });
 
         const state = portfolio.getState();
         expect(state.cash).toBe(0);
@@ -23,10 +24,10 @@ describe('Portfolio', () => {
     it('should respect commission fees on BUY', () => {
         // Cash: 1000, Fee: $10 fixed
         // Max spendable on shares: 990
-        // Price: 100 -> Qty: 9
-        // Cost: 900 + 10 = 910
+        // Price: 100.
+        // If we request 9 shares: Cost = 900 + 10 = 910. Cash Left = 90.
         const portfolio = new Portfolio(1000, { fixed: 10 });
-        portfolio.buy(SYMBOL, 100, new Date());
+        portfolio.buy(SYMBOL, { action: 'BUY', price: 100, timestamp: new Date(), quantity: 9 });
 
         const state = portfolio.getState();
         expect(state.cash).toBe(1000 - 910); // 90
@@ -36,11 +37,11 @@ describe('Portfolio', () => {
 
     it('should respect percentage fees on BUY', () => {
         // Cash: 1000, Fee: 1%
-        // Price: 100. (100 * Qty * 1.01) <= 1000
-        // Qty = floor(1000 / 101) = 9
-        // Value: 900. Fee: 9. Total: 909.
+        // Price: 100.
+        // If we request 9 shares:
+        // Value: 900. Fee: 9. Total: 909. Cash left: 91.
         const portfolio = new Portfolio(1000, { percentage: 0.01 });
-        portfolio.buy(SYMBOL, 100, new Date());
+        portfolio.buy(SYMBOL, { action: 'BUY', price: 100, timestamp: new Date(), quantity: 9 });
 
         const state = portfolio.getState();
         expect(state.cash).toBe(91);
@@ -49,8 +50,8 @@ describe('Portfolio', () => {
 
     it('should allow selling assets', () => {
         const portfolio = new Portfolio(10000);
-        portfolio.buy(SYMBOL, 100, new Date()); // Buys 100 shares
-        portfolio.sell(SYMBOL, 110, new Date()); // Sells for $11,000
+        portfolio.buy(SYMBOL, { action: 'BUY', price: 100, timestamp: new Date(), quantity: 100 }); // Buys 100 shares
+        portfolio.sell(SYMBOL, { action: 'SELL', price: 110, timestamp: new Date() }); // Sells for $11,000
 
         const state = portfolio.getState();
         expect(state.cash).toBe(11000);
@@ -61,20 +62,22 @@ describe('Portfolio', () => {
 
     it('should deduct fees on SELL', () => {
         const portfolio = new Portfolio(10000, { fixed: 10 });
-        portfolio.buy(SYMBOL, 100, new Date()); 
-        // 1. Buy: Max spendable 9990. Qty = 99. Cost = 9900 + 10 = 9910. Cash = 90.
+        portfolio.buy(SYMBOL, { action: 'BUY', price: 100, timestamp: new Date(), quantity: 99 }); 
+        // 1. Buy: 99 shares @ 100.
+        // Trade Value 9900. Fee 10. Cost 9910. Cash 90.
         
         // 2. Sell: 99 shares @ 110 = 10890.
         // Fee: 10. Net Credit: 10880.
         // Final Cash: 90 + 10880 = 10970.
-        portfolio.sell(SYMBOL, 110, new Date());
+        portfolio.sell(SYMBOL, { action: 'SELL', price: 110, timestamp: new Date() });
         
         expect(portfolio.getState().cash).toBe(10970);
     });
 
     it('should not allow buying with insufficient funds', () => {
         const portfolio = new Portfolio(50);
-        portfolio.buy(SYMBOL, 100, new Date());
+        // Try to buy 1 share at 100
+        portfolio.buy(SYMBOL, { action: 'BUY', price: 100, timestamp: new Date(), quantity: 1 });
 
         expect(portfolio.getState().positions.size).toBe(0);
         expect(portfolio.getState().cash).toBe(50);
@@ -82,7 +85,7 @@ describe('Portfolio', () => {
 
     it('should calculate total portfolio value', () => {
         const portfolio = new Portfolio(1000);
-        portfolio.buy(SYMBOL, 100, new Date()); // Buys 10 shares. Cash: 0.
+        portfolio.buy(SYMBOL, { action: 'BUY', price: 100, timestamp: new Date(), quantity: 10 }); // Buys 10 shares. Cash: 0.
         
         // If price goes to 120, total value should be 1200
         expect(portfolio.getTotalValue(120, SYMBOL)).toBe(1200);

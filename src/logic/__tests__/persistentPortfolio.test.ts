@@ -33,24 +33,25 @@ describe('PersistentPortfolio', () => {
         const portfolio = new PersistentPortfolio(portfolioId, 0, { fixed: 10 });
         await portfolio.load();
 
-        // Buy 10 shares @ 100
+        // Buy 50 shares @ 100. Cost = 5000 + 10 = 5010.
         await portfolio.executeSignal({
             action: 'BUY',
             price: 100,
-            timestamp: new Date()
+            timestamp: new Date(),
+            quantity: 50
         }, 'AAPL', 'TestStrategy');
 
         // Check In-Memory State
         const state = portfolio.getState();
-        expect(state.cash).toBeLessThan(10000); // 10000 - 1000 - 10 = 8990
-        expect(state.positions.get('AAPL')?.quantity).toBe(99); // max spendable logic
+        expect(state.cash).toBe(10000 - 5010); // 4990
+        expect(state.positions.get('AAPL')?.quantity).toBe(50);
 
         // Check Database State
         const resPort = await pool.query('SELECT current_cash FROM portfolios WHERE id = $1', [portfolioId]);
-        expect(parseFloat(resPort.rows[0].current_cash)).toBeCloseTo(state.cash);
+        expect(parseFloat(resPort.rows[0].current_cash)).toBeCloseTo(4990);
 
         const resPos = await pool.query('SELECT quantity FROM positions WHERE portfolio_id = $1', [portfolioId]);
-        expect(parseFloat(resPos.rows[0].quantity)).toBe(99);
+        expect(parseFloat(resPos.rows[0].quantity)).toBe(50);
 
         const resLedger = await pool.query('SELECT * FROM ledger_entries WHERE portfolio_id = $1', [portfolioId]);
         expect(resLedger.rows.length).toBe(1);
@@ -59,9 +60,10 @@ describe('PersistentPortfolio', () => {
 
     it('should persist SELL execution', async () => {
         const portfolio = new PersistentPortfolio(portfolioId, 0, { fixed: 10 });
-        await portfolio.load(); // Reloads state (99 shares)
+        await portfolio.load(); // Reloads state (50 shares)
 
-        // Sell all 99 shares @ 110
+        // Sell all 50 shares @ 110. Credit = 5500 - 10 = 5490.
+        // New Cash = 4990 + 5490 = 10480.
         await portfolio.executeSignal({
             action: 'SELL',
             price: 110,

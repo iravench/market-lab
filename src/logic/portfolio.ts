@@ -27,49 +27,60 @@ export class Portfolio {
     /**
      * Executes a signal.
      * For simplicity in this early version, we assume a single symbol.
-     * We also assume a simple "all-in" or "all-out" strategy for position sizing.
      */
     public executeSignal(signal: Signal, symbol: string, strategyName?: string): void {
         if (signal.action === 'BUY') {
-            this.buy(symbol, signal.price, signal.timestamp);
+            this.buy(symbol, signal);
         } else if (signal.action === 'SELL') {
-            this.sell(symbol, signal.price, signal.timestamp);
+            this.sell(symbol, signal);
         }
     }
 
-    public buy(symbol: string, price: number, timestamp: Date): void {
-        // Simple sizing: Use all available cash minus expected fees
-        // To handle fees correctly: (Price * Qty) + Fee <= Cash
-        // Let Fp = commission.percentage, Ff = commission.fixed
-        // (Price * Qty) + (Price * Qty * Fp) + Ff <= Cash
-        // Price * Qty * (1 + Fp) <= Cash - Ff
-        // Qty = (Cash - Ff) / (Price * (1 + Fp))
+    public buy(symbol: string, signal: Signal): void {
+        const { price, timestamp, quantity, stopLoss, takeProfit } = signal;
+
+        // In this version, we REQUIRE an explicit quantity for buys (provided by Risk Manager).
+        if (quantity === undefined || quantity <= 0) {
+            return;
+        }
 
         const maxSpendable = this.cash - this.commission.fixed;
         if (maxSpendable <= 0) return;
 
-        const quantity = Math.floor(maxSpendable / (price * (1 + this.commission.percentage)));
-        if (quantity <= 0) return;
+        // Calculate maximum affordable quantity considering commission
+        const maxAffordableQty = Math.floor(maxSpendable / (price * (1 + this.commission.percentage)));
+        
+        // Final quantity is the lesser of what Risk Manager requested and what we can afford.
+        const finalQuantity = Math.min(quantity, maxAffordableQty);
 
-        const tradeValue = price * quantity;
+        if (finalQuantity <= 0) return;
+
+        const tradeValue = price * finalQuantity;
         const fee = (tradeValue * this.commission.percentage) + this.commission.fixed;
         const totalCost = tradeValue + fee;
 
-        if (totalCost > this.cash) return; // Safety check
+        // Double check cost (should be safe due to math above, but floats can be tricky)
+        if (totalCost > this.cash) return; 
 
         this.cash -= totalCost;
         
         const existingPosition = this.positions.get(symbol);
         if (existingPosition) {
-            const totalQty = existingPosition.quantity + quantity;
+            const totalQty = existingPosition.quantity + finalQuantity;
             const totalCostBasis = (existingPosition.averagePrice * existingPosition.quantity) + totalCost;
             existingPosition.quantity = totalQty;
             existingPosition.averagePrice = totalCostBasis / totalQty;
+            
+            // Update stops if provided (overwrite)
+            if (stopLoss !== undefined) existingPosition.stopLoss = stopLoss;
+            if (takeProfit !== undefined) existingPosition.takeProfit = takeProfit;
         } else {
             this.positions.set(symbol, {
                 symbol,
-                quantity,
-                averagePrice: price
+                quantity: finalQuantity,
+                averagePrice: price,
+                stopLoss,
+                takeProfit
             });
         }
 
@@ -77,13 +88,14 @@ export class Portfolio {
             timestamp,
             action: 'BUY',
             price,
-            quantity,
+            quantity: finalQuantity,
             fee,
             totalValue: totalCost
         });
     }
 
-    public sell(symbol: string, price: number, timestamp: Date): void {
+    public sell(symbol: string, signal: Signal): void {
+        const { price, timestamp } = signal;
         const position = this.positions.get(symbol);
         if (!position || position.quantity <= 0) return;
 
@@ -93,7 +105,6 @@ export class Portfolio {
         const totalCredit = tradeValue - fee;
 
         // Calculate Realized PnL
-        // Cost Basis = Average Buy Price (incl fees) * Quantity
         const costBasis = position.averagePrice * quantity;
         const realizedPnL = totalCredit - costBasis;
 

@@ -18,12 +18,14 @@ export interface Signal {
     reason?: string;
     stopLoss?: number;
     takeProfit?: number;
+    quantity?: number;
 }
 
 export interface RiskConfig {
     riskPerTradePct: number; // e.g. 0.01 for 1%
     maxDrawdownPct: number;  // e.g. 0.1 for 10%
     atrMultiplier: number;   // for stops (e.g. 2.0)
+    atrPeriod: number;       // typically 14
     trailingStop: boolean;
 }
 

@@ -82,16 +82,12 @@ export class PersistentPortfolio extends Portfolio {
 
             // 2. Execute Signal
             if (signal.action === 'BUY') {
-                await this.persistBuy(client, symbol, signal.price, signal.timestamp);
+                await this.persistBuy(client, symbol, signal);
             } else if (signal.action === 'SELL') {
-                await this.persistSell(client, symbol, signal.price, signal.timestamp);
+                await this.persistSell(client, symbol, signal);
             }
 
-            // 3. Record Execution (even for HOLD? Usually we only track actions to allow retries on logic, 
-            // but for strict idempotency we should track the attempt).
-            // Let's only track IF an action was taken, OR if we want to ensure only one "check" per period.
-            // Requirement says: "prevent duplicate trades". So tracking actions is enough.
-            // But if we want to prevent multiple ANALYSES, we track every candle_time.
+            // 3. Record Execution
             await client.query(
                 `INSERT INTO strategy_executions (portfolio_id, symbol, strategy_name, candle_time)
                  VALUES ($1, $2, $3, $4)`,
@@ -111,10 +107,10 @@ export class PersistentPortfolio extends Portfolio {
         }
     }
 
-    private async persistBuy(client: PoolClient, symbol: string, price: number, timestamp: Date) {
-        // Re-implement logic with DB locks? 
-        // Or simply calculate logic in memory, then update DB?
-        // Safe approach: Read DB state with FOR UPDATE to lock row.
+    private async persistBuy(client: PoolClient, symbol: string, signal: Signal) {
+        const { price, timestamp, quantity, stopLoss, takeProfit } = signal;
+
+        if (quantity === undefined || quantity <= 0) return;
 
         const resPort = await client.query(
             `SELECT current_cash FROM portfolios WHERE id = $1 FOR UPDATE`, 
@@ -129,10 +125,12 @@ export class PersistentPortfolio extends Portfolio {
         const maxSpendable = currentCash - config.fixed;
         if (maxSpendable <= 0) return; // Not enough cash
 
-        const quantity = Math.floor(maxSpendable / (price * (1 + config.percentage)));
-        if (quantity <= 0) return;
+        const maxAffordableQty = Math.floor(maxSpendable / (price * (1 + config.percentage)));
+        const finalQuantity = Math.min(quantity, maxAffordableQty);
+        
+        if (finalQuantity <= 0) return;
 
-        const tradeValue = price * quantity;
+        const tradeValue = price * finalQuantity;
         const fee = (tradeValue * config.percentage) + config.fixed;
         const totalCost = tradeValue + fee;
 
@@ -152,18 +150,15 @@ export class PersistentPortfolio extends Portfolio {
             [this.portfolioId, symbol]
         );
 
-        let newQty = quantity;
-        let newAvgPrice = price; // If new, cost basis is price (ignoring fees for avgPrice usually? No, we included them in base class)
+        let newQty = finalQuantity;
+        let newAvgPrice = price; 
 
-        // In base class: existingPosition.averagePrice = totalCostBasis / totalQty;
-        // totalCostBasis = (oldAvg * oldQty) + totalCost (incl fees)
-        
         if (resPos.rows.length > 0) {
             const oldQty = parseFloat(resPos.rows[0].quantity);
             const oldAvg = parseFloat(resPos.rows[0].average_price);
             
             const totalCostBasis = (oldAvg * oldQty) + totalCost;
-            newQty = oldQty + quantity;
+            newQty = oldQty + finalQuantity;
             newAvgPrice = totalCostBasis / newQty;
 
             await client.query(
@@ -173,12 +168,12 @@ export class PersistentPortfolio extends Portfolio {
             );
         } else {
              // Initial cost basis per share = Total Cost / Qty
-             newAvgPrice = totalCost / quantity;
+             newAvgPrice = totalCost / finalQuantity;
              
              await client.query(
                 `INSERT INTO positions (portfolio_id, symbol, quantity, average_price)
                  VALUES ($1, $2, $3, $4)`,
-                [this.portfolioId, symbol, quantity, newAvgPrice]
+                [this.portfolioId, symbol, finalQuantity, newAvgPrice]
              );
         }
 
@@ -186,11 +181,13 @@ export class PersistentPortfolio extends Portfolio {
         await client.query(
             `INSERT INTO ledger_entries (portfolio_id, timestamp, action, symbol, quantity, price, fee)
              VALUES ($1, $2, 'BUY', $3, $4, $5, $6)`,
-            [this.portfolioId, timestamp, symbol, quantity, price, fee]
+            [this.portfolioId, timestamp, symbol, finalQuantity, price, fee]
         );
     }
 
-    private async persistSell(client: PoolClient, symbol: string, price: number, timestamp: Date) {
+    private async persistSell(client: PoolClient, symbol: string, signal: Signal) {
+        const { price, timestamp } = signal;
+
         // Lock Position
         const resPos = await client.query(
             `SELECT quantity, average_price FROM positions WHERE portfolio_id = $1 AND symbol = $2 FOR UPDATE`,
