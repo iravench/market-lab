@@ -31,7 +31,9 @@ async function main() {
     maxDrawdownPct: 0.1,
     atrMultiplier: 2.5,
     atrPeriod: 14,
-    trailingStop: true
+    trailingStop: true,
+    adxThreshold: 25,
+    dailyLossLimitPct: 0.02
   };
   const riskManager = new RiskManager(riskConfig);
 
@@ -94,11 +96,34 @@ async function main() {
       process.exit(1);
     }
 
-    // 3. Risk Check: Check Exits for existing positions
     const pos = state.positions.get(symbol);
     let finalSignal: Signal | null = null;
+    let skipStrategy = false;
 
-    if (pos) {
+    // 2b. Check Daily Loss Limit (Portfolio Guard)
+    const todaysTrades = await portfolio.loadDailyTrades(new Date());
+    const todayPnL = todaysTrades.reduce((sum, t) => sum + (t.realizedPnL || 0), 0);
+    const startOfDayEquity = currentEquity - todayPnL;
+
+    if (riskManager.checkDailyLoss(todaysTrades, startOfDayEquity, new Date())) {
+      console.error(`🛑 HARD STOP: Daily Loss Limit (${(riskConfig.dailyLossLimitPct! * 100).toFixed(1)}%) Breached.`);
+      console.error(`   Today's PnL: $${todayPnL.toFixed(2)}`);
+      skipStrategy = true;
+
+      if (pos) {
+        console.warn(`⚠️  Liquidating remaining position due to Daily Loss Limit...`);
+        const execPrice = slippageModel.calculateExecutionPrice(latestCandle.close, pos.quantity, latestCandle, 'SELL');
+        finalSignal = {
+          action: 'SELL',
+          price: execPrice,
+          timestamp: latestCandle.time,
+          reason: 'Daily Loss Limit Breach'
+        };
+      }
+    }
+
+    // 3. Risk Check: Check Exits for existing positions
+    if (!finalSignal && pos) {
       console.log(`📦 Holding: ${pos.quantity} shares @ $${pos.averagePrice.toFixed(2)}`);
       console.log(`   Stops: SL: ${pos.stopLoss?.toFixed(2) || 'None'}, TP: ${pos.takeProfit?.toFixed(2) || 'None'}`);
 
@@ -128,12 +153,12 @@ async function main() {
           }
         }
       }
-    } else {
+    } else if (!pos && !finalSignal) {
       console.log(`📦 Holding: None`);
     }
 
-    // 4. Run Strategy Logic (if no risk exit triggered)
-    if (!finalSignal) {
+    // 4. Run Strategy Logic (if no risk exit triggered and not in skip mode)
+    if (!finalSignal && !skipStrategy) {
       const strategy = new RsiStrategy({ period: 14, buyThreshold: 30, sellThreshold: 70 });
       const strategySignal = strategy.analyze(candles);
 
@@ -141,30 +166,39 @@ async function main() {
       if (strategySignal.reason) console.log(`   Reason: ${strategySignal.reason}`);
 
       if (strategySignal.action === 'BUY') {
-        // Apply Slippage to Entry
-        const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, 0, latestCandle, 'BUY');
-
-        // Enhance BUY signal with Risk Unit sizing
-        const atrSeries = calculateATR(candles, riskConfig.atrPeriod);
-        const latestAtr = atrSeries[atrSeries.length - 1];
-        const equity = portfolio.getTotalValue(latestCandle.close, symbol);
-
-        if (latestAtr) {
-          const stopLoss = riskManager.calculateATRStop(latestCandle.close, latestAtr, 'BUY');
-          const quantity = riskManager.calculatePositionSize(equity, execPrice, stopLoss);
-
-          finalSignal = {
-            ...strategySignal,
-            price: execPrice,
-            quantity,
-            stopLoss
-          };
-          console.log(`🛡️  Risk Sizing: Requested ${quantity} shares @ $${execPrice.toFixed(2)}, Stop Loss: $${stopLoss.toFixed(2)}`);
+        // Regime Detection (ADX Filter)
+        if (!riskManager.isMarketTrending(candles)) {
+          console.log(`🛡️  Trade Filtered: Market is choppy (Low ADX).`);
         } else {
-          console.warn('⚠️  Could not calculate ATR for sizing. Skipping BUY.');
+          // Apply Slippage to Entry
+          const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, 0, latestCandle, 'BUY');
+
+          // Enhance BUY signal with Risk Unit sizing
+          const atrSeries = calculateATR(candles, riskConfig.atrPeriod);
+          const latestAtr = atrSeries[atrSeries.length - 1];
+          const equity = portfolio.getTotalValue(latestCandle.close, symbol);
+
+          if (latestAtr) {
+            const stopLoss = riskManager.calculateATRStop(latestCandle.close, latestAtr, 'BUY');
+            const quantity = riskManager.calculatePositionSize(equity, execPrice, stopLoss);
+
+            if (quantity > 0) {
+              finalSignal = {
+                ...strategySignal,
+                price: execPrice,
+                quantity,
+                stopLoss
+              };
+              console.log(`🛡️  Risk Sizing: Requested ${quantity} shares @ $${execPrice.toFixed(2)}, Stop Loss: $${stopLoss.toFixed(2)}`);
+            } else {
+              console.log('🛡️  Risk Sizing: Position size is 0. Skipping BUY.');
+            }
+          } else {
+            console.warn('⚠️  Could not calculate ATR for sizing. Skipping BUY.');
+          }
         }
-      } else if (strategySignal.action === 'SELL') {
-        const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, pos?.quantity || 0, latestCandle, 'SELL');
+      } else if (strategySignal.action === 'SELL' && pos) {
+        const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, pos.quantity, latestCandle, 'SELL');
         finalSignal = { ...strategySignal, price: execPrice };
       }
     }

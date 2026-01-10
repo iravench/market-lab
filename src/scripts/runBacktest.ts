@@ -43,7 +43,9 @@ async function main() {
       maxDrawdownPct: 0.1,   // 10%
       atrMultiplier: 2.5,
       atrPeriod: 14,
-      trailingStop: true
+      trailingStop: true,
+      adxThreshold: 25,     // Regime Detection
+      dailyLossLimitPct: 0.02 // 2% Daily Loss Limit
     };
 
     const slippageModel = new FixedPercentageSlippage(0.001); // 0.1% slippage

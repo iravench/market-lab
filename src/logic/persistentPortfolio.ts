@@ -59,6 +59,41 @@ export class PersistentPortfolio extends Portfolio {
   }
 
   /**
+   * Loads trades for a specific date from the ledger.
+   * Useful for Daily Loss Limit calculations.
+   */
+  public async loadDailyTrades(date: Date): Promise<Trade[]> {
+    const client = await pool.connect();
+    try {
+      // Create start and end of day in UTC
+      const startOfDay = new Date(date);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(date);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      const res = await client.query(
+        `SELECT timestamp, action, symbol, quantity, price, fee, realized_pnl
+         FROM ledger_entries 
+         WHERE portfolio_id = $1 AND timestamp >= $2 AND timestamp <= $3`,
+        [this.portfolioId, startOfDay, endOfDay]
+      );
+
+      return res.rows.map(row => ({
+        timestamp: new Date(row.timestamp),
+        action: row.action, // 'BUY' | 'SELL'
+        price: parseFloat(row.price),
+        quantity: parseFloat(row.quantity),
+        fee: parseFloat(row.fee),
+        totalValue: 0, // Not stored explicitly, usually price * qty +/- fee
+        realizedPnL: row.realized_pnl ? parseFloat(row.realized_pnl) : undefined
+      }));
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Overrides executeSignal to persist changes to the DB atomically.
    */
   public async executeSignal(signal: Signal, symbol: string, strategyName: string): Promise<void> {

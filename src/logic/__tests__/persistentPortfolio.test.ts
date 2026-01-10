@@ -78,4 +78,26 @@ describe('PersistentPortfolio', () => {
     expect(resLedger.rows[0].action).toBe('SELL');
     expect(parseFloat(resLedger.rows[0].realized_pnl)).toBeGreaterThan(0);
   });
+
+  it('should load daily trades correctly', async () => {
+    const portfolio = new PersistentPortfolio(portfolioId);
+    
+    // We already have a BUY and a SELL from previous tests executed "today" (new Date())
+    const trades = await portfolio.loadDailyTrades(new Date());
+
+    expect(trades.length).toBeGreaterThanOrEqual(2); // At least the Buy and Sell from above
+    expect(trades.some(t => t.action === 'BUY')).toBe(true);
+    expect(trades.some(t => t.action === 'SELL')).toBe(true);
+
+    // Verify PnL is present on the SELL
+    const sellTrade = trades.find(t => t.action === 'SELL');
+    expect(sellTrade?.realizedPnL).toBeDefined();
+    expect(sellTrade?.realizedPnL).not.toBe(0);
+
+    // Verify requesting a different date returns nothing
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const oldTrades = await portfolio.loadDailyTrades(yesterday);
+    expect(oldTrades.length).toBe(0);
+  });
 });
