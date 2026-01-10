@@ -2,6 +2,7 @@ import { CandleRepository } from '../db/repository';
 import { Backtester } from '../logic/backtester';
 import { Portfolio } from '../logic/portfolio';
 import { RsiStrategy } from '../logic/strategies/rsiStrategy';
+import { RiskConfig } from '../logic/types';
 import pool from '../db';
 
 async function main() {
@@ -35,7 +36,16 @@ async function main() {
         const initialCapital = 10000;
         const portfolio = new Portfolio(initialCapital, { fixed: 10 }); // $10 commission per trade
         const strategy = new RsiStrategy({ period: 14, buyThreshold: 30, sellThreshold: 70 });
-        const backtester = new Backtester(strategy, portfolio, symbol);
+        
+        const riskConfig: RiskConfig = {
+            riskPerTradePct: 0.01, // 1%
+            maxDrawdownPct: 0.1,   // 10%
+            atrMultiplier: 2.5,
+            atrPeriod: 14,
+            trailingStop: true
+        };
+
+        const backtester = new Backtester(strategy, portfolio, symbol, riskConfig);
 
         // 3. Run Simulation
         const result = backtester.run(candles);
