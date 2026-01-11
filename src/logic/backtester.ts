@@ -4,6 +4,7 @@ import { PerformanceAnalyzer } from './analysis';
 import { RiskManager } from './risk/risk_manager';
 import { calculateATR } from './indicators/atr';
 import { SlippageModel, ZeroSlippage } from './slippage';
+import { calculateReturns } from './math';
 
 export class Backtester {
   private portfolio: Portfolio;
@@ -32,8 +33,11 @@ export class Backtester {
 
   /**
    * Runs the simulation over the provided historical candles.
+   * @param candles The primary symbol's history (must be aligned with auxiliaryData if provided)
+   * @param auxiliaryData Optional map of other symbols' history (for correlation checks). 
+   *                      MUST be aligned with `candles` (same length, same timestamps).
    */
-  public run(candles: Candle[]): BacktestResult {
+  public run(candles: Candle[], auxiliaryData?: Map<string, Candle[]>): BacktestResult {
     if (candles.length === 0) {
       throw new Error('No candles provided for backtest');
     }
@@ -51,6 +55,17 @@ export class Backtester {
     if (this.riskManager) {
       const period = this.riskManager.config.atrPeriod || 14;
       atrSeries = calculateATR(candles, period);
+    }
+
+    // Pre-calculate returns for correlation check
+    let primaryReturns: number[] = [];
+    const auxiliaryReturns = new Map<string, number[]>();
+    
+    if (this.riskManager && auxiliaryData) {
+      primaryReturns = calculateReturns(candles.map(c => c.close));
+      for (const [sym, auxCandles] of auxiliaryData) {
+        auxiliaryReturns.set(sym, calculateReturns(auxCandles.map(c => c.close)));
+      }
     }
 
     // Main Simulation Loop
@@ -152,6 +167,26 @@ export class Backtester {
         if (!this.riskManager.isMarketTrending(visibleHistory)) {
           finalSignal.action = 'HOLD';
           finalSignal.reason = 'Market is choppy (Low ADX)';
+        }
+        
+        // Correlation Check
+        if (this.riskManager.config.maxCorrelation && auxiliaryData && auxiliaryData.size > 0) {
+            const lookback = 30; 
+            // Only check if we have enough history
+            if (i >= lookback) {
+                // Returns slice: [i - lookback + 1 ... i]
+                const candidateSlice = primaryReturns.slice(i - lookback + 1, i + 1);
+                
+                const portfolioSlices = new Map<string, number[]>();
+                for (const [sym, ret] of auxiliaryReturns) {
+                    portfolioSlices.set(sym, ret.slice(i - lookback + 1, i + 1));
+                }
+
+                if (this.riskManager.checkCorrelation(candidateSlice, portfolioSlices)) {
+                    finalSignal.action = 'HOLD';
+                    finalSignal.reason = 'High Correlation';
+                }
+            }
         }
       }
 

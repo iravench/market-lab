@@ -52,3 +52,18 @@ export function calculateCorrelation(seriesA: number[], seriesB: number[]): numb
 
   return numerator / denominator;
 }
+
+/**
+ * Calculates percentage returns from a series of prices.
+ * returns[i] = (prices[i] - prices[i-1]) / prices[i-1]
+ * returns[0] is always 0.
+ */
+export function calculateReturns(prices: number[]): number[] {
+  const returns = new Array(prices.length).fill(0);
+  for (let i = 1; i < prices.length; i++) {
+    if (prices[i - 1] !== 0) {
+      returns[i] = (prices[i] - prices[i - 1]) / prices[i - 1];
+    }
+  }
+  return returns;
+}

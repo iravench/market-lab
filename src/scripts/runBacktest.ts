@@ -2,36 +2,66 @@ import { CandleRepository } from '../db/repository';
 import { Backtester } from '../logic/backtester';
 import { Portfolio } from '../logic/portfolio';
 import { RsiStrategy } from '../logic/strategies/rsiStrategy';
-import { RiskConfig } from '../logic/types';
+import { RiskConfig, Candle } from '../logic/types';
 import { FixedPercentageSlippage } from '../logic/slippage';
+import { MarketDataProvider } from '../services/marketDataProvider';
 import pool from '../db';
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 3) {
-    console.error('Usage: npm run backtest <SYMBOL> <START_DATE> <END_DATE>');
-    console.error('Example: npm run backtest BTC-USD 2023-01-01 2023-12-31');
+    console.error('Usage: npm run backtest <SYMBOL> <START_DATE> <END_DATE> [CORRELATION_SYMBOLS]');
+    console.error('Example: npm run backtest BTC-USD 2023-01-01 2023-12-31 ETH-USD,SOL-USD');
     process.exit(1);
   }
 
-  const [symbol, startStr, endStr] = args;
+  const [symbol, startStr, endStr, correlationArg] = args;
   const startDate = new Date(startStr);
   const endDate = new Date(endStr);
   const interval = '1d'; // Default to daily for now
 
+  const correlationSymbols = correlationArg ? correlationArg.split(',').map(s => s.trim()) : [];
+
   console.log(`🚀 Starting Backtest for ${symbol} (${interval})`);
   console.log(`📅 Period: ${startDate.toDateString()} - ${endDate.toDateString()}`);
+  if (correlationSymbols.length > 0) {
+    console.log(`🔗 Checking Correlation with: ${correlationSymbols.join(', ')}`);
+  }
 
   try {
-    // 1. Fetch Data
-    const repo = new CandleRepository();
-    const candles = await repo.getCandles(symbol, interval, startDate, endDate);
+    let candles: Candle[] = [];
+    let auxiliaryData: Map<string, Candle[]> | undefined;
 
-    if (candles.length === 0) {
-      console.error('❌ No data found for the specified range. Did you run "npm run backfill"?');
-      process.exit(1);
+    // 1. Fetch Data
+    if (correlationSymbols.length > 0) {
+      console.log('📥 Fetching aligned multi-asset data...');
+      const provider = new MarketDataProvider();
+      const allSymbols = [symbol, ...correlationSymbols];
+      const alignedData = await provider.getAlignedCandles(allSymbols, interval, startDate, endDate);
+
+      if (!alignedData.has(symbol) || alignedData.get(symbol)!.length === 0) {
+         console.error(`❌ No data found for primary symbol ${symbol} (after alignment).`);
+         process.exit(1);
+      }
+
+      candles = alignedData.get(symbol)!;
+      auxiliaryData = new Map();
+      for (const s of correlationSymbols) {
+        if (alignedData.has(s)) {
+          auxiliaryData.set(s, alignedData.get(s)!);
+        }
+      }
+      console.log(`📊 Loaded ${candles.length} aligned candles.`);
+
+    } else {
+      const repo = new CandleRepository();
+      candles = await repo.getCandles(symbol, interval, startDate, endDate);
+      if (candles.length === 0) {
+        console.error('❌ No data found for the specified range. Did you run "npm run backfill"?');
+        process.exit(1);
+      }
+      console.log(`📊 Loaded ${candles.length} candles.`);
     }
-    console.log(`📊 Loaded ${candles.length} candles.`);
 
     // 2. Setup Components
     const initialCapital = 10000;
@@ -45,7 +75,8 @@ async function main() {
       atrPeriod: 14,
       trailingStop: true,
       adxThreshold: 25,     // Regime Detection
-      dailyLossLimitPct: 0.02 // 2% Daily Loss Limit
+      dailyLossLimitPct: 0.02, // 2% Daily Loss Limit
+      maxCorrelation: 0.7   // Portfolio Guard
     };
 
     const slippageModel = new FixedPercentageSlippage(0.001); // 0.1% slippage
@@ -53,7 +84,7 @@ async function main() {
     const backtester = new Backtester(strategy, portfolio, symbol, riskConfig, slippageModel);
 
     // 3. Run Simulation
-    const result = backtester.run(candles);
+    const result = backtester.run(candles, auxiliaryData);
 
     // 4. Report
     console.log('\n=======================================');

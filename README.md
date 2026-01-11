@@ -53,7 +53,7 @@ The system is composed of three decoupled domains:
 * [x] **Defensive Logic:** Implement Chandelier Exits (ATR Trailing Stops).
 * [x] **Regime Detection:** Filter trades based on ADX (Trend vs Chop).
 * [x] **Portfolio Guard:** Implement Daily Loss Limits.
-* [ ] **Portfolio Guard:** Implement Correlation checks (Logic Implemented, Data Layer Pending).
+* [x] **Portfolio Guard:** Implement Correlation checks.
 * [ ] **Goal:** A robust, professional-grade system that prioritizes capital preservation.
 
 ## 5. Getting Started
@@ -114,8 +114,8 @@ The system is composed of three decoupled domains:
 * **Run Backtest:**
 
     ```bash
-    npm run backtest <SYMBOL> <START> <END>
-    # Example: npm run backtest CBA.AX 2023-01-01 2024-01-01
+    npm run backtest <SYMBOL> <START> <END> [CORRELATION_SYMBOLS]
+    # Example: npm run backtest CBA.AX 2023-01-01 2024-01-01 "NAB.AX,WBC.AX"
     ```
 
 * **Paper Trading (Bot):**

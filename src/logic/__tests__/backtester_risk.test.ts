@@ -181,4 +181,40 @@ describe('Backtester with Risk Management', () => {
     expect(trades[1].action).toBe('SELL');
     expect(trades[1].realizedPnL).toBeLessThan(-200); // Confirm we actually lost enough
   });
+
+  it('should filter trades based on correlation', () => {
+    const portfolio = new Portfolio(10000);
+    const strategy = new MockStrategy();
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', { ...riskConfig, maxCorrelation: 0.7, adxThreshold: 0 });
+
+    // 40 candles of primary (AAPL) with some variance
+    const primaryPrices = new Array(40).fill(0).map((_, i) => 100 + i);
+    const primaryCandles = createCandles(primaryPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
+    
+    // Auxiliary data (MSFT) that is perfectly correlated
+    const auxCandles = createCandles(primaryPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
+    const auxiliaryData = new Map<string, Candle[]>();
+    auxiliaryData.set('MSFT', auxCandles);
+
+    // Trigger BUY on last candle
+    strategy.analyze = (c) => {
+      if (c.length === 40) return { action: 'BUY', price: 139, timestamp: c[39].time };
+      return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
+    };
+
+    const result = backtester.run(primaryCandles, auxiliaryData);
+
+    // Should be filtered because correlation is 1
+    expect(result.trades.length).toBe(0);
+
+    // Now test uncorrelated (random-ish or inverse)
+    const uncorrelatedPrices = new Array(40).fill(0).map((_, i) => 100 - (i % 5));
+    const uncorrelatedAux = createCandles(uncorrelatedPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
+    const auxUncorrelated = new Map<string, Candle[]>();
+    auxUncorrelated.set('GLD', uncorrelatedAux);
+
+    const resultUncorrelated = backtester.run(primaryCandles, auxUncorrelated);
+    expect(resultUncorrelated.trades.length).toBe(1);
+    expect(resultUncorrelated.trades[0].action).toBe('BUY');
+  });
 });

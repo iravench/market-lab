@@ -6,6 +6,8 @@ import { Candle, Signal, RiskConfig } from '../logic/types';
 import { RiskManager } from '../logic/risk/risk_manager';
 import { calculateATR } from '../logic/indicators/atr';
 import { FixedPercentageSlippage } from '../logic/slippage';
+import { CandleRepository } from '../db/repository';
+import { calculateReturns } from '../logic/math';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -33,7 +35,8 @@ async function main() {
     atrPeriod: 14,
     trailingStop: true,
     adxThreshold: 25,
-    dailyLossLimitPct: 0.02
+    dailyLossLimitPct: 0.02,
+    maxCorrelation: 0.7
   };
   const riskManager = new RiskManager(riskConfig);
 
@@ -170,31 +173,83 @@ async function main() {
         if (!riskManager.isMarketTrending(candles)) {
           console.log(`🛡️  Trade Filtered: Market is choppy (Low ADX).`);
         } else {
-          // Apply Slippage to Entry
-          const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, 0, latestCandle, 'BUY');
+          // --- CORRELATION CHECK ---
+          let correlationBreach = false;
+          const existingSymbols = Array.from(state.positions.keys()).filter(s => s !== symbol);
 
-          // Enhance BUY signal with Risk Unit sizing
-          const atrSeries = calculateATR(candles, riskConfig.atrPeriod);
-          const latestAtr = atrSeries[atrSeries.length - 1];
-          const equity = portfolio.getTotalValue(latestCandle.close, symbol);
+          if (existingSymbols.length > 0 && riskConfig.maxCorrelation) {
+            console.log(`🔎 Checking correlation with portfolio: ${existingSymbols.join(', ')}`);
+            const repo = new CandleRepository();
+            // Fetch portfolio data from DB
+            const portfolioData = await repo.getMultiSymbolCandles(existingSymbols, '1d', startDate, endDate);
 
-          if (latestAtr) {
-            const stopLoss = riskManager.calculateATRStop(latestCandle.close, latestAtr, 'BUY');
-            const quantity = riskManager.calculatePositionSize(equity, execPrice, stopLoss);
+            // Pairwise check
+            const targetMap = new Map<string, number>();
+            candles.forEach(c => targetMap.set(c.time.toISOString(), c.close));
 
-            if (quantity > 0) {
-              finalSignal = {
-                ...strategySignal,
-                price: execPrice,
-                quantity,
-                stopLoss
-              };
-              console.log(`🛡️  Risk Sizing: Requested ${quantity} shares @ $${execPrice.toFixed(2)}, Stop Loss: $${stopLoss.toFixed(2)}`);
-            } else {
-              console.log('🛡️  Risk Sizing: Position size is 0. Skipping BUY.');
+            for (const [posSymbol, posCandles] of portfolioData) {
+              const posMap = new Map<string, number>();
+              posCandles.forEach(c => posMap.set(c.time.toISOString(), c.close));
+
+              // Find intersection
+              const commonTimes: string[] = [];
+              candles.forEach(c => {
+                const t = c.time.toISOString();
+                if (posMap.has(t)) commonTimes.push(t);
+              });
+
+              if (commonTimes.length < 30) {
+                console.warn(`⚠️  Insufficient overlap for ${posSymbol} (${commonTimes.length} pts). Skipping.`);
+                continue;
+              }
+
+              const targetPrices = commonTimes.map(t => targetMap.get(t)!);
+              const posPrices = commonTimes.map(t => posMap.get(t)!);
+
+              const targetRets = calculateReturns(targetPrices);
+              const posRets = calculateReturns(posPrices);
+
+              // Check correlation for this pair
+              const singleMap = new Map<string, number[]>();
+              singleMap.set(posSymbol, posRets);
+
+              if (riskManager.checkCorrelation(targetRets, singleMap)) {
+                console.log(`❌ High Correlation detected with ${posSymbol}.`);
+                correlationBreach = true;
+                break;
+              }
             }
+          }
+
+          if (correlationBreach) {
+             console.log(`🛡️  Trade Filtered: Correlation limit exceeded.`);
           } else {
-            console.warn('⚠️  Could not calculate ATR for sizing. Skipping BUY.');
+            // Apply Slippage to Entry
+            const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, 0, latestCandle, 'BUY');
+
+            // Enhance BUY signal with Risk Unit sizing
+            const atrSeries = calculateATR(candles, riskConfig.atrPeriod);
+            const latestAtr = atrSeries[atrSeries.length - 1];
+            const equity = portfolio.getTotalValue(latestCandle.close, symbol);
+
+            if (latestAtr) {
+              const stopLoss = riskManager.calculateATRStop(latestCandle.close, latestAtr, 'BUY');
+              const quantity = riskManager.calculatePositionSize(equity, execPrice, stopLoss);
+
+              if (quantity > 0) {
+                finalSignal = {
+                  ...strategySignal,
+                  price: execPrice,
+                  quantity,
+                  stopLoss
+                };
+                console.log(`🛡️  Risk Sizing: Requested ${quantity} shares @ $${execPrice.toFixed(2)}, Stop Loss: $${stopLoss.toFixed(2)}`);
+              } else {
+                console.log('🛡️  Risk Sizing: Position size is 0. Skipping BUY.');
+              }
+            } else {
+              console.warn('⚠️  Could not calculate ATR for sizing. Skipping BUY.');
+            }
           }
         }
       } else if (strategySignal.action === 'SELL' && pos) {
