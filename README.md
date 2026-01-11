@@ -46,7 +46,7 @@ The system is composed of three decoupled domains:
 * [x] Build a scheduler to run strategies on live data intervals (via CLI automation).
 * [x] **Goal:** A "bot" that trades in real-time with fake money.
 
-### Phase 5: Risk Management & Sophistication (Current)
+### Phase 5: Risk Management & Sophistication
 
 * [x] **Indicators:** Implement ATR, ADX, MACD, Bollinger Bands.
 * [x] **Risk Engine:** Implement Volatility-Adjusted Sizing (Risk Unit).
@@ -56,6 +56,20 @@ The system is composed of three decoupled domains:
 * [x] **Portfolio Guard:** Implement Daily Loss Limits.
 * [x] **Portfolio Guard:** Implement Correlation checks.
 * [x] **Goal:** A robust, professional-grade system that prioritizes capital preservation.
+
+### Phase 6: Portfolio Intelligence (Current)
+
+* [ ] **Multi-Asset Backtester:** Upgrade `Backtester` to iterate a "Universe" timeline, enabling true portfolio simulation.
+* [ ] **Sector Exposure:** Implement constraints to limit risk concentration (e.g., "Max 20% Technology").
+* [ ] **Unified Loop:** Refactor `runBacktest.ts` to load and trade multiple assets simultaneously.
+* [ ] **Goal:** A system that thinks in terms of a "Portfolio," not just individual stocks.
+
+### Phase 7: The Optimization Lab (Strategy Tuning)
+
+* [ ] **Metric Expansion:** Implement Calmar Ratio, Sortino Ratio, and SQN to measure stability.
+* [ ] **Experiment Persistence:** Create a DB table (`backtest_runs`) to log every simulation result.
+* [ ] **The Automator:** Build a CLI tool for Bayesian/Grid search optimization with Walk-Forward Validation.
+* [ ] **Goal:** A data-driven research lab to find robust, stable strategy parameters.
 
 ## 5. Getting Started
 
