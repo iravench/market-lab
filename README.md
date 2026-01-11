@@ -59,9 +59,9 @@ The system is composed of three decoupled domains:
 
 ### Phase 6: Portfolio Intelligence (Current)
 
-* [ ] **Multi-Asset Backtester:** Upgrade `Backtester` to iterate a "Universe" timeline, enabling true portfolio simulation.
+* [x] **Multi-Asset Backtester:** Upgrade `Backtester` to iterate a "Universe" timeline, enabling true portfolio simulation.
 * [ ] **Sector Exposure:** Implement constraints to limit risk concentration (e.g., "Max 20% Technology").
-* [ ] **Unified Loop:** Refactor `runBacktest.ts` to load and trade multiple assets simultaneously.
+* [x] **Unified Loop:** Refactor `runBacktest.ts` to load and trade multiple assets simultaneously.
 * [ ] **Goal:** A system that thinks in terms of a "Portfolio," not just individual stocks.
 
 ### Phase 7: The Optimization Lab (Strategy Tuning)
