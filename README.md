@@ -129,8 +129,8 @@ The system is composed of three decoupled domains:
 * **Run Backtest:**
 
     ```bash
-    npm run backtest <SYMBOL> <START> <END> [CORRELATION_SYMBOLS]
-    # Example: npm run backtest CBA.AX 2023-01-01 2024-01-01 "NAB.AX,WBC.AX"
+    npm run backtest <SYMBOLS_CSV> <START> <END>
+    # Example: npm run backtest "CBA.AX,NAB.AX,WBC.AX" 2023-01-01 2024-01-01
     ```
 
 * **Paper Trading (Bot):**

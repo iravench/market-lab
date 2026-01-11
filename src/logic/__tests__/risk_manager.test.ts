@@ -179,6 +179,7 @@ describe('RiskManager', () => {
     const tradesOk = [
       {
         timestamp: new Date('2024-01-10T10:00:00Z'),
+        symbol: 'AAPL',
         action: 'SELL' as const,
         price: 90,
         quantity: 10,
@@ -194,6 +195,7 @@ describe('RiskManager', () => {
       ...tradesOk,
       {
         timestamp: new Date('2024-01-10T14:00:00Z'),
+        symbol: 'AAPL',
         action: 'SELL' as const,
         price: 85,
         quantity: 5,
@@ -208,6 +210,7 @@ describe('RiskManager', () => {
     const tradesYesterday = [
       {
         timestamp: new Date('2024-01-09T10:00:00Z'),
+        symbol: 'AAPL',
         action: 'SELL' as const,
         price: 80,
         quantity: 100,

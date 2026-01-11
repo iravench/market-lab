@@ -118,6 +118,7 @@ export class Portfolio {
 
     this.trades.push({
       timestamp,
+      symbol,
       action: 'BUY',
       price,
       quantity: finalQuantity,
@@ -142,6 +143,7 @@ export class Portfolio {
 
     this.trades.push({
       timestamp,
+      symbol,
       action: 'SELL',
       price,
       quantity,

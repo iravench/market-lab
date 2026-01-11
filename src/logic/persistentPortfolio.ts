@@ -81,6 +81,7 @@ export class PersistentPortfolio extends Portfolio {
 
       return res.rows.map(row => ({
         timestamp: new Date(row.timestamp),
+        symbol: row.symbol,
         action: row.action, // 'BUY' | 'SELL'
         price: parseFloat(row.price),
         quantity: parseFloat(row.quantity),

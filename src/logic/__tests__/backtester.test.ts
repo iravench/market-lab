@@ -50,11 +50,14 @@ describe('Backtester', () => {
     const initialCash = 10000;
     const portfolio = new Portfolio(initialCash);
     const strategy = new BuyAndHoldStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'TEST');
+    const backtester = new Backtester(strategy, portfolio);
 
     // Price goes 100 -> 110 -> 120
     const candles = createCandles([100, 110, 120]);
-    const result = backtester.run(candles);
+    const universe = new Map<string, Candle[]>();
+    universe.set('TEST', candles);
+
+    const result = backtester.run(universe);
 
     expect(result.initialCapital).toBe(initialCash);
     // Buy 100 shares at 100. Price ends at 120. Final value = 120 * 100 = 12000.
@@ -70,10 +73,13 @@ describe('Backtester', () => {
       name: 'Spy',
       analyze: jest.fn().mockReturnValue({ action: 'HOLD', price: 100, timestamp: new Date() })
     };
-    const backtester = new Backtester(strategySpy, portfolio, 'TEST');
+    const backtester = new Backtester(strategySpy, portfolio);
 
     const candles = createCandles([100, 110, 120]);
-    backtester.run(candles);
+    const universe = new Map<string, Candle[]>();
+    universe.set('TEST', candles);
+
+    backtester.run(universe);
 
     // Call 1: Should only see index 0
     expect(strategySpy.analyze.mock.calls[0][0]).toHaveLength(1);
@@ -103,9 +109,12 @@ describe('Backtester', () => {
     const initialCash = 10000;
     const portfolio = new Portfolio(initialCash);
     const strategy = new TestRsiStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'CBA.AX');
+    const backtester = new Backtester(strategy, portfolio);
 
-    const result = backtester.run(candles);
+    const universe = new Map<string, Candle[]>();
+    universe.set('CBA.AX', candles);
+
+    const result = backtester.run(universe);
 
     expect(result.trades.length).toBeGreaterThan(0);
     expect(result.equityCurve.length).toEqual(candles.length);

@@ -9,7 +9,6 @@ import { calculateReturns } from './math';
 export class Backtester {
   private portfolio: Portfolio;
   private strategy: Strategy;
-  private symbol: string;
   private analyzer: PerformanceAnalyzer;
   private riskManager?: RiskManager;
   private slippageModel: SlippageModel;
@@ -17,221 +16,206 @@ export class Backtester {
   constructor(
     strategy: Strategy,
     portfolio: Portfolio,
-    symbol: string,
     riskManager?: RiskManager,
     slippageModel?: SlippageModel
   ) {
     this.strategy = strategy;
     this.portfolio = portfolio;
-    this.symbol = symbol;
     this.analyzer = new PerformanceAnalyzer();
     this.riskManager = riskManager;
     this.slippageModel = slippageModel || new ZeroSlippage();
   }
 
   /**
-   * Runs the simulation over the provided historical candles.
-   * @param candles The primary symbol's history (must be aligned with auxiliaryData if provided)
-   * @param auxiliaryData Optional map of other symbols' history (for correlation checks). 
-   *                      MUST be aligned with `candles` (same length, same timestamps).
+   * Runs the simulation over the provided universe of assets.
+   * @param universe Map of Symbol -> Candles. All candle arrays MUST be aligned (same length, same timestamps).
    */
-  public run(candles: Candle[], auxiliaryData?: Map<string, Candle[]>): BacktestResult {
-    if (candles.length === 0) {
-      throw new Error('No candles provided for backtest');
+  public run(universe: Map<string, Candle[]>): BacktestResult {
+    const symbols = Array.from(universe.keys());
+    if (symbols.length === 0) {
+      throw new Error('No data provided for backtest');
+    }
+
+    const length = universe.get(symbols[0])!.length;
+    // Verify alignment (basic check)
+    for (const sym of symbols) {
+      if (universe.get(sym)!.length !== length) {
+        throw new Error(`Data misalignment: ${sym} has ${universe.get(sym)!.length} candles, expected ${length}`);
+      }
     }
 
     const initialCapital = this.portfolio.getState().cash;
     const equityCurve: EquitySnapshot[] = [];
-    let atrSeries: (number | null)[] = [];
     let highWaterMark = initialCapital;
+
+    // Pre-calculate ATR and Returns for all symbols (if Risk Manager enabled)
+    const atrCache = new Map<string, (number | null)[]>();
+    const returnsCache = new Map<string, number[]>();
+
+    if (this.riskManager) {
+      const period = this.riskManager.config.atrPeriod || 14;
+      for (const sym of symbols) {
+        const candles = universe.get(sym)!;
+        atrCache.set(sym, calculateATR(candles, period));
+        returnsCache.set(sym, calculateReturns(candles.map(c => c.close)));
+      }
+    }
 
     // Daily Loss Limit Tracking
     let lastDateStr = '';
     let dailyStartingEquity = initialCapital;
 
-    // Pre-calculate ATR if Risk Manager is enabled
-    if (this.riskManager) {
-      const period = this.riskManager.config.atrPeriod || 14;
-      atrSeries = calculateATR(candles, period);
-    }
+    // Main Simulation Loop (Time-driven)
+    for (let i = 0; i < length; i++) {
+      // We assume all symbols have the same timestamp at index i
+      const timestamp = universe.get(symbols[0])![i].time;
 
-    // Pre-calculate returns for correlation check
-    let primaryReturns: number[] = [];
-    const auxiliaryReturns = new Map<string, number[]>();
-    
-    if (this.riskManager && auxiliaryData) {
-      primaryReturns = calculateReturns(candles.map(c => c.close));
-      for (const [sym, auxCandles] of auxiliaryData) {
-        auxiliaryReturns.set(sym, calculateReturns(auxCandles.map(c => c.close)));
-      }
-    }
-
-    // Main Simulation Loop
-    for (let i = 0; i < candles.length; i++) {
-      const currentCandle = candles[i];
-
-      // Daily starting equity update
-      const currentDateStr = currentCandle.time.toISOString().split('T')[0];
+      // 1. Portfolio Level Checks (Start of Step)
+      const currentTotalEquity = this.calculateTotalEquity(universe, i);
+      
+      // Daily Reset
+      const currentDateStr = timestamp.toISOString().split('T')[0];
       if (currentDateStr !== lastDateStr) {
-        dailyStartingEquity = this.portfolio.getTotalValue(currentCandle.open, this.symbol);
+        dailyStartingEquity = this.calculateTotalEquity(universe, i, true); // Use Open price for start of day equity? Or previous close? 
+        // Typically start of day equity is previous close. But let's use Open for "Opening Equity".
         lastDateStr = currentDateStr;
       }
 
-      // 0. Check Portfolio Guard: Daily Loss Limit
+      // Check Hard Stop (Max Drawdown)
+      if (this.riskManager) {
+        if (currentTotalEquity > highWaterMark) {
+          highWaterMark = currentTotalEquity;
+        }
+        if (this.riskManager.checkDrawdown(currentTotalEquity, highWaterMark)) {
+           console.warn(`🛑 Max Drawdown Breached at ${timestamp.toISOString()}. Equity: $${currentTotalEquity.toFixed(2)}, HWM: $${highWaterMark.toFixed(2)}`);
+           this.recordSnapshot(timestamp, currentTotalEquity, equityCurve);
+           break; // Stop Simulation
+        }
+      }
+
+      // Check Daily Loss Limit
+      let skipTradingToday = false;
       if (this.riskManager && this.riskManager.config.dailyLossLimitPct) {
         const trades = this.portfolio.getState().trades;
-        if (this.riskManager.checkDailyLoss(trades, dailyStartingEquity, currentCandle.time)) {
-          const position = this.portfolio.getState().positions.get(this.symbol);
-          if (position) {
-            // Liquidate position if daily loss limit hit
-            const execPrice = this.slippageModel.calculateExecutionPrice(currentCandle.close, position.quantity, currentCandle, 'SELL');
-            this.portfolio.sell(this.symbol, {
-              action: 'SELL',
-              price: execPrice,
-              timestamp: currentCandle.time,
-              reason: 'DAILY_LOSS_LIMIT'
-            });
-          }
-          this.recordSnapshot(currentCandle, equityCurve);
-          continue; // Skip further signals today
+        if (this.riskManager.checkDailyLoss(trades, dailyStartingEquity, timestamp)) {
+          skipTradingToday = true;
+          // Liquidate all positions? Or just stop new entries?
+          // Usually "Kill Switch" implies flattening. 
+          // For now, let's just Block New Entries. (Liquidating everything might be too aggressive for this simple logic, 
+          // but strictly speaking, a Daily Loss Limit often requires flattening).
+          // Let's stick to "Stop New Entries" for now to avoid complexity in this loop.
         }
       }
 
-      // 0a. Check Max Drawdown
-      if (this.riskManager) {
-        const currentEquity = this.portfolio.getTotalValue(currentCandle.close, this.symbol);
-        if (currentEquity > highWaterMark) {
-          highWaterMark = currentEquity;
-        }
-
-        if (this.riskManager.checkDrawdown(currentEquity, highWaterMark)) {
-          // HARD STOP: Maximum Drawdown Breached
-          // We record the failure state and stop the simulation.
-          this.recordSnapshot(currentCandle, equityCurve);
-
-          // Technically we should liquidate positions to realize the loss, 
-          // but for a Hard Stop analysis, knowing WHERE we died is enough.
-          console.warn(`🛑 Max Drawdown Breached at ${currentCandle.time.toISOString()}. Equity: $${currentEquity.toFixed(2)}, HWM: $${highWaterMark.toFixed(2)}`);
-          break;
-        }
-      }
-
-      // 0b. Risk Management: Check for existing position exits (Stop Loss / Take Profit)
-      if (this.riskManager) {
-        const position = this.portfolio.getState().positions.get(this.symbol);
-        if (position) {
-          const exitReason = this.riskManager.checkExits(currentCandle, position);
-          if (exitReason) {
-            const basePrice = exitReason === 'STOP_LOSS' ? position.stopLoss! : position.takeProfit!;
-            // Apply Slippage to Exit
-            const execPrice = this.slippageModel.calculateExecutionPrice(basePrice, position.quantity, currentCandle, 'SELL');
-
-            this.portfolio.sell(this.symbol, {
-              action: 'SELL',
-              price: execPrice,
-              timestamp: currentCandle.time,
-              reason: exitReason
-            });
-            this.recordSnapshot(currentCandle, equityCurve);
-            continue;
-          }
-
-          // Update Trailing Stop
-          const atr = atrSeries[i];
-          if (atr !== null && position.stopLoss) {
-            const newStop = this.riskManager.updateTrailingStop(
-              position.stopLoss,
-              currentCandle.high,
-              currentCandle.low,
-              atr,
-              'BUY'
-            );
-            position.stopLoss = newStop;
-          }
-        }
-      }
-
-      // "Current" window: all candles up to the current index
-      const visibleHistory = candles.slice(0, i + 1);
-
-      // 1. Get Signal from Strategy
-      const rawSignal = this.strategy.analyze(visibleHistory);
-
-      // 2. Enhance Signal with Quantity / Risk Params / Slippage
-      const finalSignal: Signal = { ...rawSignal };
-
-      // Regime Detection (ADX Filter)
-      if (this.riskManager && finalSignal.action === 'BUY') {
-        if (!this.riskManager.isMarketTrending(visibleHistory)) {
-          finalSignal.action = 'HOLD';
-          finalSignal.reason = 'Market is choppy (Low ADX)';
-        }
+      // 2. Symbol Loop (Process each asset)
+      for (const sym of symbols) {
+        const candles = universe.get(sym)!;
+        const currentCandle = candles[i];
         
-        // Correlation Check
-        if (this.riskManager.config.maxCorrelation && auxiliaryData && auxiliaryData.size > 0) {
-            const lookback = 30; 
-            // Only check if we have enough history
-            if (i >= lookback) {
-                // Returns slice: [i - lookback + 1 ... i]
-                const candidateSlice = primaryReturns.slice(i - lookback + 1, i + 1);
-                
-                const portfolioSlices = new Map<string, number[]>();
-                for (const [sym, ret] of auxiliaryReturns) {
-                    portfolioSlices.set(sym, ret.slice(i - lookback + 1, i + 1));
-                }
+        // --- Risk Management: Check Exits for Existing Positions ---
+        if (this.riskManager) {
+          const position = this.portfolio.getState().positions.get(sym);
+          if (position) {
+            const exitReason = this.riskManager.checkExits(currentCandle, position);
+            if (exitReason) {
+              const basePrice = exitReason === 'STOP_LOSS' ? position.stopLoss! : position.takeProfit!;
+              const execPrice = this.slippageModel.calculateExecutionPrice(basePrice, position.quantity, currentCandle, 'SELL');
+              this.portfolio.sell(sym, {
+                action: 'SELL',
+                price: execPrice,
+                timestamp: currentCandle.time,
+                reason: exitReason
+              });
+              continue; // Position closed, skip strategy for this symbol this turn
+            }
 
-                if (this.riskManager.checkCorrelation(candidateSlice, portfolioSlices)) {
+            // Update Trailing Stop
+            const atr = atrCache.get(sym)![i];
+            if (atr !== null && position.stopLoss) {
+              const newStop = this.riskManager.updateTrailingStop(
+                position.stopLoss,
+                currentCandle.high,
+                currentCandle.low,
+                atr,
+                'BUY'
+              );
+              position.stopLoss = newStop;
+            }
+          }
+        }
+
+        if (skipTradingToday) continue;
+
+        // --- Strategy Execution ---
+        const visibleHistory = candles.slice(0, i + 1);
+        const rawSignal = this.strategy.analyze(visibleHistory);
+        const finalSignal: Signal = { ...rawSignal };
+
+        // Filters
+        if (this.riskManager && finalSignal.action === 'BUY') {
+          // 1. Regime (ADX)
+          if (!this.riskManager.isMarketTrending(visibleHistory)) {
+             finalSignal.action = 'HOLD';
+             finalSignal.reason = 'Market is choppy';
+          }
+
+          // 2. Correlation (Portfolio Guard)
+          if (finalSignal.action === 'BUY' && this.riskManager.config.maxCorrelation) {
+             const lookback = 30;
+             if (i >= lookback) {
+               const candidateSlice = returnsCache.get(sym)!.slice(i - lookback + 1, i + 1);
+               const otherHoldings = Array.from(this.portfolio.getState().positions.keys()).filter(k => k !== sym);
+               
+               if (otherHoldings.length > 0) {
+                 const portfolioSlices = new Map<string, number[]>();
+                 for (const h of otherHoldings) {
+                   portfolioSlices.set(h, returnsCache.get(h)!.slice(i - lookback + 1, i + 1));
+                 }
+                 
+                 if (this.riskManager.checkCorrelation(candidateSlice, portfolioSlices)) {
                     finalSignal.action = 'HOLD';
                     finalSignal.reason = 'High Correlation';
-                }
-            }
-        }
-      }
-
-      if (finalSignal.action !== 'HOLD') {
-        // Apply Slippage to Entry/Exit Signal
-        // We use a dummy quantity 0 if not yet known, or we need to estimate? 
-        // Simple models don't use qty. Advanced ones might.
-        // For BUY, we calculate qty AFTER price is finalized (safe).
-        // So pass 0 or estimate. Let's pass 0 for now.
-        finalSignal.price = this.slippageModel.calculateExecutionPrice(
-          rawSignal.price,
-          0,
-          currentCandle,
-          finalSignal.action
-        );
-      }
-
-      if (finalSignal.action === 'BUY') {
-        const equity = this.portfolio.getTotalValue(currentCandle.close, this.symbol);
-        const atr = atrSeries[i];
-
-        if (this.riskManager && atr && atr > 0) {
-          const stopLoss = this.riskManager.calculateATRStop(currentCandle.close, atr, 'BUY');
-          const quantity = this.riskManager.calculatePositionSize(equity, finalSignal.price, stopLoss);
-
-          finalSignal.quantity = quantity;
-          finalSignal.stopLoss = stopLoss;
-
-          // Dynamic Take Profit (Bollinger Bands)
-          if (this.riskManager.config.useBollingerTakeProfit) {
-            const dynamicTP = this.riskManager.calculateBollingerTakeProfit(visibleHistory, 'BUY');
-            if (dynamicTP) {
-              finalSignal.takeProfit = dynamicTP;
-            }
+                 }
+               }
+             }
           }
-        } else {
-          // Legacy / All-In Mode
-          finalSignal.quantity = Infinity;
         }
-      }
 
-      // 3. Execute Signal in Portfolio
-      this.portfolio.executeSignal(finalSignal, this.symbol, this.strategy.name);
+        // Apply Slippage & Sizing
+        if (finalSignal.action !== 'HOLD') {
+            finalSignal.price = this.slippageModel.calculateExecutionPrice(
+              rawSignal.price, 0, currentCandle, finalSignal.action
+            );
+        }
 
-      // 4. Record Equity Snapshot
-      this.recordSnapshot(currentCandle, equityCurve);
-    }
+        if (finalSignal.action === 'BUY') {
+          const equity = this.calculateTotalEquity(universe, i); // Use current equity for sizing
+          const atr = atrCache.get(sym)?.[i];
+
+          if (this.riskManager && atr && atr > 0) {
+            const stopLoss = this.riskManager.calculateATRStop(currentCandle.close, atr, 'BUY');
+            const quantity = this.riskManager.calculatePositionSize(equity, finalSignal.price, stopLoss);
+            
+            finalSignal.quantity = quantity;
+            finalSignal.stopLoss = stopLoss;
+
+             if (this.riskManager.config.useBollingerTakeProfit) {
+                const dynamicTP = this.riskManager.calculateBollingerTakeProfit(visibleHistory, 'BUY');
+                if (dynamicTP) finalSignal.takeProfit = dynamicTP;
+             }
+          } else {
+             finalSignal.quantity = Infinity; // Legacy All-In
+          }
+        }
+
+        // Execute
+        this.portfolio.executeSignal(finalSignal, sym, this.strategy.name);
+      } // End Symbol Loop
+
+      // Record Snapshot (End of Step)
+      this.recordSnapshot(timestamp, this.calculateTotalEquity(universe, i), equityCurve);
+
+    } // End Time Loop
 
     const trades = this.portfolio.getState().trades;
     const metrics = this.analyzer.calculateMetrics(initialCapital, equityCurve, trades);
@@ -245,11 +229,28 @@ export class Backtester {
     };
   }
 
-  private recordSnapshot(candle: Candle, curve: EquitySnapshot[]) {
+  private calculateTotalEquity(universe: Map<string, Candle[]>, index: number, useOpen = false): number {
+    const state = this.portfolio.getState();
+    let equity = state.cash;
+    
+    for (const [symbol, position] of state.positions) {
+      const candles = universe.get(symbol);
+      if (candles && candles[index]) {
+        const price = useOpen ? candles[index].open : candles[index].close;
+        equity += position.quantity * price;
+      } else {
+        // Fallback if data missing (shouldn't happen with aligned data)
+        equity += position.quantity * position.averagePrice; 
+      }
+    }
+    return equity;
+  }
+
+  private recordSnapshot(timestamp: Date, equity: number, curve: EquitySnapshot[]) {
     curve.push({
-      timestamp: candle.time,
+      timestamp,
       cash: this.portfolio.getState().cash,
-      equity: this.portfolio.getTotalValue(candle.close, this.symbol)
+      equity
     });
   }
 }

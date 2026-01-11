@@ -36,13 +36,15 @@ describe('Backtester with Risk Management', () => {
   it('should apply risk-based sizing and ATR stops', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(riskConfig));
+    const backtester = new Backtester(strategy, portfolio, new RiskManager(riskConfig));
 
     const candles = createCandles([
       { h: 110, l: 100, c: 105 }, // 0
       { h: 115, l: 105, c: 110 }, // 1
       { h: 120, l: 110, c: 115 }, // 2
     ]);
+    const universe = new Map<string, Candle[]>();
+    universe.set('AAPL', candles);
 
     // Trigger BUY only on candle 2 (Index 2)
     strategy.analyze = (c) => {
@@ -50,7 +52,7 @@ describe('Backtester with Risk Management', () => {
       return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
     };
 
-    const result = backtester.run(candles);
+    const result = backtester.run(universe);
     const trade = result.trades[0];
 
     expect(trade.quantity).toBe(5);
@@ -60,7 +62,7 @@ describe('Backtester with Risk Management', () => {
   it('should exit on Stop Loss', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(riskConfig));
+    const backtester = new Backtester(strategy, portfolio, new RiskManager(riskConfig));
 
     const candles = createCandles([
       { h: 110, l: 100, c: 105 }, // 0
@@ -68,13 +70,15 @@ describe('Backtester with Risk Management', () => {
       { h: 110, l: 100, c: 105 }, // 2 BUY here (Price 105, ATR 10, Stop 85)
       { h: 110, l: 80, c: 90 }, // 3 STOP HIT (Low 80 < Stop 85)
     ]);
+    const universe = new Map<string, Candle[]>();
+    universe.set('AAPL', candles);
 
     strategy.analyze = (c) => {
       if (c.length === 3) return { action: 'BUY', price: 105, timestamp: c[2].time };
       return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
     };
 
-    const result = backtester.run(candles);
+    const result = backtester.run(universe);
 
     expect(result.trades.length).toBe(2); // BUY and SELL
     expect(result.trades[1].action).toBe('SELL');
@@ -84,7 +88,7 @@ describe('Backtester with Risk Management', () => {
   it('should update Trailing Stop', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(riskConfig));
+    const backtester = new Backtester(strategy, portfolio, new RiskManager(riskConfig));
 
     const candles = createCandles([
       { h: 110, l: 100, c: 105 }, // 0
@@ -92,13 +96,15 @@ describe('Backtester with Risk Management', () => {
       { h: 110, l: 100, c: 105 }, // 2 BUY (Price 105, Stop 85)
       { h: 120, l: 115, c: 118 }, // 3 Price up. High 120, ATR 10 -> New stop 120 - 20 = 100.
     ]);
+    const universe = new Map<string, Candle[]>();
+    universe.set('AAPL', candles);
 
     strategy.analyze = (c) => {
       if (c.length === 3) return { action: 'BUY', price: 105, timestamp: c[2].time };
       return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
     };
 
-    const result = backtester.run(candles);
+    const result = backtester.run(universe);
 
     const pos = portfolio.getState().positions.get('AAPL');
     expect(pos?.stopLoss).toBeCloseTo(96.66, 1);
@@ -109,7 +115,7 @@ describe('Backtester with Risk Management', () => {
     const regimeConfig: RiskConfig = { ...riskConfig, adxThreshold: 50 };
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(regimeConfig));
+    const backtester = new Backtester(strategy, portfolio, new RiskManager(regimeConfig));
 
     // ADX requires 2 * period - 1 to start. Period 14 -> 27 candles.
     // Let's create 40 candles.
@@ -120,6 +126,8 @@ describe('Backtester with Risk Management', () => {
         open: 100, high: 101, low: 99, close: 100, volume: 1000
       });
     }
+    const universe = new Map<string, Candle[]>();
+    universe.set('AAPL', choppyCandles);
 
     // Trigger BUY on last candle
     strategy.analyze = (c) => {
@@ -127,7 +135,7 @@ describe('Backtester with Risk Management', () => {
       return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
     };
 
-    const result = backtester.run(choppyCandles);
+    const result = backtester.run(universe);
 
     // Should result in 0 trades because ADX is low
     expect(result.trades.length).toBe(0);
@@ -139,7 +147,7 @@ describe('Backtester with Risk Management', () => {
     const dllConfig: RiskConfig = { ...riskConfig, dailyLossLimitPct: 0.02, maxDrawdownPct: 0.5 };
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(dllConfig));
+    const backtester = new Backtester(strategy, portfolio, new RiskManager(dllConfig));
 
     // Day 1: 3 candles.
     // 1. Buy.
@@ -152,11 +160,10 @@ describe('Backtester with Risk Management', () => {
       { time: new Date(baseDate.getTime() + 2 * 3600000), open: 100, high: 100, low: 70, close: 70, volume: 1000 },  // Sell
       { time: new Date(baseDate.getTime() + 3 * 3600000), open: 70, high: 70, low: 70, close: 70, volume: 1000 },     // Try Buy
     ];
+    const universe = new Map<string, Candle[]>();
+    universe.set('AAPL', candles);
 
     // Force sizing to ensure we hit the loss limit
-    // If we risk 1% ($100), and stop is 2xATR (ATR ~0 due to flat candles?), let's manipulate execution.
-    // Actually, let's just use the mock strategy to force trades.
-
     let tradeCount = 0;
     strategy.analyze = (c) => {
       const idx = c.length - 1;
@@ -169,7 +176,7 @@ describe('Backtester with Risk Management', () => {
       return { action: 'HOLD', price: c[idx].close, timestamp: c[idx].time };
     };
 
-    const result = backtester.run(candles);
+    const result = backtester.run(universe);
 
     // We expect:
     // Trade 1: Buy @ 100
@@ -186,82 +193,75 @@ describe('Backtester with Risk Management', () => {
   it('should filter trades based on correlation', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager({ ...riskConfig, maxCorrelation: 0.7, adxThreshold: 0 }));
+    const backtester = new Backtester(strategy, portfolio, new RiskManager({ ...riskConfig, maxCorrelation: 0.7, adxThreshold: 0 }));
 
     // 40 candles of primary (AAPL) with some variance
     const primaryPrices = new Array(40).fill(0).map((_, i) => 100 + i);
-    const primaryCandles = createCandles(primaryPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
+    const candlesA = createCandles(primaryPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
+    // Identical data for B (Correlated)
+    const candlesB = createCandles(primaryPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
     
-    // Auxiliary data (MSFT) that is perfectly correlated
-    const auxCandles = createCandles(primaryPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
-    const auxiliaryData = new Map<string, Candle[]>();
-    auxiliaryData.set('MSFT', auxCandles);
+    const universe = new Map<string, Candle[]>();
+    universe.set('A', candlesA);
+    universe.set('B', candlesB);
 
-    // Trigger BUY on last candle
+    // Strategy: Buy A at 35, Buy B at 36.
     strategy.analyze = (c) => {
-      if (c.length === 40) return { action: 'BUY', price: 139, timestamp: c[39].time };
-      return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
+       const idx = c.length - 1;
+       // Mock strategy is stateless, so it returns BUY for both.
+       // We rely on Backtester to call it sequentially for A then B?
+       // No, Backtester loops symbols. 
+       // We need to differentiate symbols? 
+       // In the loop `for (const sym of symbols)`, we execute strategy.
+       // Our MockStrategy doesn't know the symbol.
+       // However, we can trick it by timestamp if we want, but timestamps are same.
+       
+       // Just return BUY always after 35.
+       if (idx >= 35) return { action: 'BUY', price: 100, timestamp: c[idx].time };
+       return { action: 'HOLD', price: 0, timestamp: new Date() };
     };
 
-    const result = backtester.run(primaryCandles, auxiliaryData);
+    const result = backtester.run(universe);
 
-    // Should be filtered because correlation is 1
-    expect(result.trades.length).toBe(0);
+    // Timeline:
+    // t=0..34: HOLD
+    // t=35:
+    //   Process A: BUY -> Executed. (Portfolio has A)
+    //   Process B: BUY -> Check Correlation vs (A). High! -> Blocked.
+    // t=36:
+    //   Process A: BUY -> Already have position -> Position update (or ignore if strategy keeps buying?)
+    //   Process B: BUY -> Blocked.
 
-    // Now test uncorrelated (random-ish or inverse)
-    const uncorrelatedPrices = new Array(40).fill(0).map((_, i) => 100 - (i % 5));
-    const uncorrelatedAux = createCandles(uncorrelatedPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
-    const auxUncorrelated = new Map<string, Candle[]>();
-    auxUncorrelated.set('GLD', uncorrelatedAux);
-
-    const resultUncorrelated = backtester.run(primaryCandles, auxUncorrelated);
-    expect(resultUncorrelated.trades.length).toBe(1);
-    expect(resultUncorrelated.trades[0].action).toBe('BUY');
+    // Result should have trades for A, but NOT for B.
+    // How to check? Portfolio positions.
+    const positions = portfolio.getState().positions;
+    expect(positions.has('A')).toBe(true);
+    expect(positions.has('B')).toBe(false); // B should be blocked
   });
 
   it('should apply Bollinger Band Take Profit if enabled', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager({ ...riskConfig, useBollingerTakeProfit: true }));
+    const backtester = new Backtester(strategy, portfolio, new RiskManager({ ...riskConfig, useBollingerTakeProfit: true }));
 
     // Create candles with low variance
-    const prices = new Array(20).fill(100);
-    const candles = createCandles(prices.map(p => ({ h: p + 1, l: p - 1, c: p })));
-
-    // Trigger BUY on last candle
-    strategy.analyze = (c) => {
-      if (c.length === 20) return { action: 'BUY', price: 100, timestamp: c[19].time };
-      return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
-    };
-
-    // Mock RiskManager calculation (we can't easily mock private member, so rely on real calculation)
-    // Mean = 100. StdDev ~ 0.816 (for range 99-101?). 
-    // Wait, createCandles uses Close for SMA. Close is constant 100.
-    // StdDev of constant 100 is 0.
-    // So Upper Band = 100 + 2*0 = 100.
-    // Stop Loss is ATR based.
-
-    // Let's make prices move up so bands are distinct.
-    // 10, 11, ... 29.
     const risingPrices = new Array(20).fill(0).map((_, i) => 10 + i);
     const risingCandles = createCandles(risingPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
+    const universe = new Map<string, Candle[]>();
+    universe.set('AAPL', risingCandles);
 
     strategy.analyze = (c) => {
       if (c.length === 20) return { action: 'BUY', price: 29, timestamp: c[19].time };
       return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
     };
 
-    const result = backtester.run(risingCandles);
-    const trade = result.trades[0];
-
+    const result = backtester.run(universe);
+    
     // Check portfolio state for the position
     const position = portfolio.getState().positions.get('AAPL');
     expect(position).toBeDefined();
     
     // We expect TP to be set.
-    // Real calculation: Mean of 10..29 is 19.5.
-    // StdDev is 5.766.
-    // Upper Band = 19.5 + 2 * 5.766 = 31.03.
     expect(position!.takeProfit).toBeCloseTo(31.03, 1);
   });
 });

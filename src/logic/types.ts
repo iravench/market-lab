@@ -45,6 +45,7 @@ export interface Strategy {
 
 export interface Trade {
   timestamp: Date;
+  symbol: string;
   action: 'BUY' | 'SELL';
   price: number;
   quantity: number;
