@@ -1,5 +1,6 @@
 import { CandleRepository } from '../db/repository';
 import { Candle } from '../logic/types';
+import { calculateReturns } from '../logic/math';
 
 export class MarketDataProvider {
   private repo: CandleRepository;
@@ -69,5 +70,25 @@ export class MarketDataProvider {
     }
 
     return alignedData;
+  }
+
+  /**
+   * Returns aligned percentage returns for multiple symbols.
+   */
+  async getAlignedReturns(
+    symbols: string[],
+    interval: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Map<string, number[]>> {
+    const alignedCandles = await this.getAlignedCandles(symbols, interval, startDate, endDate);
+    const alignedReturns = new Map<string, number[]>();
+
+    for (const [symbol, candles] of alignedCandles) {
+      const prices = candles.map(c => c.close);
+      alignedReturns.set(symbol, calculateReturns(prices));
+    }
+
+    return alignedReturns;
   }
 }

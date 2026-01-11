@@ -6,8 +6,7 @@ import { Candle, Signal, RiskConfig } from '../logic/types';
 import { RiskManager } from '../logic/risk/risk_manager';
 import { calculateATR } from '../logic/indicators/atr';
 import { FixedPercentageSlippage } from '../logic/slippage';
-import { CandleRepository } from '../db/repository';
-import { calculateReturns } from '../logic/math';
+import { MarketDataProvider } from '../services/marketDataProvider';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -26,6 +25,7 @@ async function main() {
 
   // Execution Configuration
   const slippageModel = new FixedPercentageSlippage(0.001); // 0.1% slippage
+  const marketDataProvider = new MarketDataProvider();
 
   // Risk Configuration
   const riskConfig: RiskConfig = {
@@ -180,44 +180,29 @@ async function main() {
 
           if (existingSymbols.length > 0 && riskConfig.maxCorrelation) {
             console.log(`🔎 Checking correlation with portfolio: ${existingSymbols.join(', ')}`);
-            const repo = new CandleRepository();
-            // Fetch portfolio data from DB
-            const portfolioData = await repo.getMultiSymbolCandles(existingSymbols, '1d', startDate, endDate);
+            
+            // Use MarketDataProvider to get aligned returns for all symbols
+            const allSymbols = [symbol, ...existingSymbols];
+            const alignedReturns = await marketDataProvider.getAlignedReturns(allSymbols, '1d', startDate, endDate);
 
-            // Pairwise check
-            const targetMap = new Map<string, number>();
-            candles.forEach(c => targetMap.set(c.time.toISOString(), c.close));
+            const targetRets = alignedReturns.get(symbol);
 
-            for (const [posSymbol, posCandles] of portfolioData) {
-              const posMap = new Map<string, number>();
-              posCandles.forEach(c => posMap.set(c.time.toISOString(), c.close));
+            if (!targetRets || targetRets.length < 30) {
+              console.warn(`⚠️  Insufficient aligned data for correlation check (needed 30, got ${targetRets?.length || 0}).`);
+            } else {
+              // Check correlation with each existing position
+              for (const posSymbol of existingSymbols) {
+                const posRets = alignedReturns.get(posSymbol);
+                if (!posRets) continue;
 
-              // Find intersection
-              const commonTimes: string[] = [];
-              candles.forEach(c => {
-                const t = c.time.toISOString();
-                if (posMap.has(t)) commonTimes.push(t);
-              });
+                const singleMap = new Map<string, number[]>();
+                singleMap.set(posSymbol, posRets);
 
-              if (commonTimes.length < 30) {
-                console.warn(`⚠️  Insufficient overlap for ${posSymbol} (${commonTimes.length} pts). Skipping.`);
-                continue;
-              }
-
-              const targetPrices = commonTimes.map(t => targetMap.get(t)!);
-              const posPrices = commonTimes.map(t => posMap.get(t)!);
-
-              const targetRets = calculateReturns(targetPrices);
-              const posRets = calculateReturns(posPrices);
-
-              // Check correlation for this pair
-              const singleMap = new Map<string, number[]>();
-              singleMap.set(posSymbol, posRets);
-
-              if (riskManager.checkCorrelation(targetRets, singleMap)) {
-                console.log(`❌ High Correlation detected with ${posSymbol}.`);
-                correlationBreach = true;
-                break;
+                if (riskManager.checkCorrelation(targetRets, singleMap)) {
+                  console.log(`❌ High Correlation detected with ${posSymbol}.`);
+                  correlationBreach = true;
+                  break;
+                }
               }
             }
           }
