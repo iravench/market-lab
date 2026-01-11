@@ -41,7 +41,7 @@ Strategies that work well in trending markets often fail in chopping (sideways) 
 ## 4. Portfolio & Systemic Risk
 Individual trades may be safe, but a collection of correlated trades can be fatal.
 
-*   **Correlation Limits (Planned/In-Progress):** 
+*   **Correlation Limits (Implemented):** 
     *   **Problem:** If the portfolio holds 10 stocks that are all highly correlated (e.g., all Tech stocks), diversification is an illusion. A crash in that sector destroys the entire account.
     *   **Mechanism:** Before entering a new trade, calculate the **Pearson Correlation Coefficient** between the candidate asset and *every* existing holding over the last N periods (e.g., 30 days).
     *   **Threshold:** If Correlation > 0.7 (or < -0.7 for hedging) with *any* existing position, the new trade is blocked.
