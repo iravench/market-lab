@@ -7,6 +7,8 @@ import { FixedPercentageSlippage } from '../logic/slippage';
 import { MarketDataProvider } from '../services/marketDataProvider';
 import pool from '../db';
 
+import { RiskManager } from '../logic/risk/risk_manager';
+
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 3) {
@@ -76,12 +78,14 @@ async function main() {
       trailingStop: true,
       adxThreshold: 25,     // Regime Detection
       dailyLossLimitPct: 0.02, // 2% Daily Loss Limit
-      maxCorrelation: 0.7   // Portfolio Guard
+      maxCorrelation: 0.7,   // Portfolio Guard
+      useBollingerTakeProfit: true
     };
+    const riskManager = new RiskManager(riskConfig);
 
     const slippageModel = new FixedPercentageSlippage(0.001); // 0.1% slippage
 
-    const backtester = new Backtester(strategy, portfolio, symbol, riskConfig, slippageModel);
+    const backtester = new Backtester(strategy, portfolio, symbol, riskManager, slippageModel);
 
     // 3. Run Simulation
     const result = backtester.run(candles, auxiliaryData);

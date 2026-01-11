@@ -184,23 +184,10 @@ export class PersistentPortfolio extends Portfolio {
     );
     const currentCash = parseFloat(resPort.rows[0].current_cash);
 
-    // Get Commission
-    const config = this.commission;
+    const details = this.calculateBuyDetails(currentCash, price, quantity);
+    if (!details) return;
 
-    // Logic: Max Spendable
-    const maxSpendable = currentCash - config.fixed;
-    if (maxSpendable <= 0) return; // Not enough cash
-
-    const maxAffordableQty = Math.floor(maxSpendable / (price * (1 + config.percentage)));
-    const finalQuantity = Math.min(quantity, maxAffordableQty);
-
-    if (finalQuantity <= 0) return;
-
-    const tradeValue = price * finalQuantity;
-    const fee = (tradeValue * config.percentage) + config.fixed;
-    const totalCost = tradeValue + fee;
-
-    if (totalCost > currentCash) return;
+    const { finalQuantity, fee, totalCost } = details;
 
     // Update Cash
     const newCash = currentCash - totalCost;
@@ -270,15 +257,10 @@ export class PersistentPortfolio extends Portfolio {
     // Sell All (for now)
     const quantity = qtyHeld;
 
-    // Calc Financials
-    const config = this.commission;
-    const tradeValue = price * quantity;
-    const fee = (tradeValue * config.percentage) + config.fixed;
-    const totalCredit = tradeValue - fee;
+    const details = this.calculateSellDetails(quantity, price, avgPrice);
+    if (!details) return;
 
-    // Calc PnL
-    const costBasis = avgPrice * quantity;
-    const realizedPnL = totalCredit - costBasis;
+    const { fee, totalCredit, realizedPnL } = details;
 
     // Update Cash
     await client.query(

@@ -1,6 +1,7 @@
 import { Backtester } from '../backtester';
 import { Portfolio } from '../portfolio';
 import { Strategy, Candle, Signal, RiskConfig } from '../types';
+import { RiskManager } from '../risk/risk_manager';
 
 class MockStrategy implements Strategy {
   public name = 'Mock Strategy';
@@ -35,7 +36,7 @@ describe('Backtester with Risk Management', () => {
   it('should apply risk-based sizing and ATR stops', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', riskConfig);
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(riskConfig));
 
     const candles = createCandles([
       { h: 110, l: 100, c: 105 }, // 0
@@ -59,7 +60,7 @@ describe('Backtester with Risk Management', () => {
   it('should exit on Stop Loss', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', riskConfig);
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(riskConfig));
 
     const candles = createCandles([
       { h: 110, l: 100, c: 105 }, // 0
@@ -83,7 +84,7 @@ describe('Backtester with Risk Management', () => {
   it('should update Trailing Stop', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', riskConfig);
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(riskConfig));
 
     const candles = createCandles([
       { h: 110, l: 100, c: 105 }, // 0
@@ -108,7 +109,7 @@ describe('Backtester with Risk Management', () => {
     const regimeConfig: RiskConfig = { ...riskConfig, adxThreshold: 50 };
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', regimeConfig);
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(regimeConfig));
 
     // ADX requires 2 * period - 1 to start. Period 14 -> 27 candles.
     // Let's create 40 candles.
@@ -138,7 +139,7 @@ describe('Backtester with Risk Management', () => {
     const dllConfig: RiskConfig = { ...riskConfig, dailyLossLimitPct: 0.02, maxDrawdownPct: 0.5 };
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', dllConfig);
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager(dllConfig));
 
     // Day 1: 3 candles.
     // 1. Buy.
@@ -185,7 +186,7 @@ describe('Backtester with Risk Management', () => {
   it('should filter trades based on correlation', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', { ...riskConfig, maxCorrelation: 0.7, adxThreshold: 0 });
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager({ ...riskConfig, maxCorrelation: 0.7, adxThreshold: 0 }));
 
     // 40 candles of primary (AAPL) with some variance
     const primaryPrices = new Array(40).fill(0).map((_, i) => 100 + i);
@@ -221,7 +222,7 @@ describe('Backtester with Risk Management', () => {
   it('should apply Bollinger Band Take Profit if enabled', () => {
     const portfolio = new Portfolio(10000);
     const strategy = new MockStrategy();
-    const backtester = new Backtester(strategy, portfolio, 'AAPL', { ...riskConfig, useBollingerTakeProfit: true });
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', new RiskManager({ ...riskConfig, useBollingerTakeProfit: true }));
 
     // Create candles with low variance
     const prices = new Array(20).fill(100);

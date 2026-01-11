@@ -1,5 +1,5 @@
 import { Portfolio } from './portfolio';
-import { Strategy, Candle, BacktestResult, EquitySnapshot, RiskConfig, Signal } from './types';
+import { Strategy, Candle, BacktestResult, EquitySnapshot, Signal } from './types';
 import { PerformanceAnalyzer } from './analysis';
 import { RiskManager } from './risk/risk_manager';
 import { calculateATR } from './indicators/atr';
@@ -18,16 +18,14 @@ export class Backtester {
     strategy: Strategy,
     portfolio: Portfolio,
     symbol: string,
-    riskConfig?: RiskConfig,
+    riskManager?: RiskManager,
     slippageModel?: SlippageModel
   ) {
     this.strategy = strategy;
     this.portfolio = portfolio;
     this.symbol = symbol;
     this.analyzer = new PerformanceAnalyzer();
-    if (riskConfig) {
-      this.riskManager = new RiskManager(riskConfig);
-    }
+    this.riskManager = riskManager;
     this.slippageModel = slippageModel || new ZeroSlippage();
   }
 

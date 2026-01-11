@@ -38,31 +38,61 @@ export class Portfolio {
     }
   }
 
-  public buy(symbol: string, signal: Signal): void {
-    const { price, timestamp, quantity, stopLoss, takeProfit } = signal;
+  /**
+   * Calculates the financial details of a BUY trade.
+   * Pure math: determines max affordable quantity, fees, and total cost.
+   */
+  public calculateBuyDetails(availableCash: number, price: number, requestedQuantity: number) {
+    if (requestedQuantity <= 0) return null;
 
-    // In this version, we REQUIRE an explicit quantity for buys (provided by Risk Manager).
-    if (quantity === undefined || quantity <= 0) {
-      return;
-    }
-
-    const maxSpendable = this.cash - this.commission.fixed;
-    if (maxSpendable <= 0) return;
+    const maxSpendable = availableCash - this.commission.fixed;
+    if (maxSpendable <= 0) return null;
 
     // Calculate maximum affordable quantity considering commission
     const maxAffordableQty = Math.floor(maxSpendable / (price * (1 + this.commission.percentage)));
 
     // Final quantity is the lesser of what Risk Manager requested and what we can afford.
-    const finalQuantity = Math.min(quantity, maxAffordableQty);
+    const finalQuantity = Math.min(requestedQuantity, maxAffordableQty);
 
-    if (finalQuantity <= 0) return;
+    if (finalQuantity <= 0) return null;
 
     const tradeValue = price * finalQuantity;
     const fee = (tradeValue * this.commission.percentage) + this.commission.fixed;
     const totalCost = tradeValue + fee;
 
-    // Double check cost (should be safe due to math above, but floats can be tricky)
-    if (totalCost > this.cash) return;
+    // Safety check
+    if (totalCost > availableCash) return null;
+
+    return { finalQuantity, fee, totalCost, tradeValue };
+  }
+
+  /**
+   * Calculates the financial details of a SELL trade.
+   * Pure math: determines fees, credit, and realized PnL.
+   */
+  public calculateSellDetails(quantityToSell: number, price: number, avgEntryPrice: number) {
+    if (quantityToSell <= 0) return null;
+
+    const tradeValue = price * quantityToSell;
+    const fee = (tradeValue * this.commission.percentage) + this.commission.fixed;
+    const totalCredit = tradeValue - fee;
+
+    // Calculate Realized PnL
+    const costBasis = avgEntryPrice * quantityToSell;
+    const realizedPnL = totalCredit - costBasis;
+
+    return { fee, totalCredit, realizedPnL, tradeValue };
+  }
+
+  public buy(symbol: string, signal: Signal): void {
+    const { price, timestamp, quantity, stopLoss, takeProfit } = signal;
+
+    if (quantity === undefined || quantity <= 0) return;
+
+    const details = this.calculateBuyDetails(this.cash, price, quantity);
+    if (!details) return;
+
+    const { finalQuantity, fee, totalCost } = details;
 
     this.cash -= totalCost;
 
@@ -102,13 +132,10 @@ export class Portfolio {
     if (!position || position.quantity <= 0) return;
 
     const quantity = position.quantity;
-    const tradeValue = price * quantity;
-    const fee = (tradeValue * this.commission.percentage) + this.commission.fixed;
-    const totalCredit = tradeValue - fee;
+    const details = this.calculateSellDetails(quantity, price, position.averagePrice);
+    if (!details) return;
 
-    // Calculate Realized PnL
-    const costBasis = position.averagePrice * quantity;
-    const realizedPnL = totalCredit - costBasis;
+    const { fee, totalCredit, realizedPnL } = details;
 
     this.cash += totalCredit;
     this.positions.delete(symbol);
