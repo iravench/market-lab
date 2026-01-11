@@ -57,12 +57,12 @@ The system is composed of three decoupled domains:
 * [x] **Portfolio Guard:** Implement Correlation checks.
 * [x] **Goal:** A robust, professional-grade system that prioritizes capital preservation.
 
-### Phase 6: Portfolio Intelligence (Current)
+### Phase 6: Portfolio Intelligence (Completed)
 
 * [x] **Multi-Asset Backtester:** Upgrade `Backtester` to iterate a "Universe" timeline, enabling true portfolio simulation.
-* [ ] **Sector Exposure:** Implement constraints to limit risk concentration (e.g., "Max 20% Technology").
+* [x] **Sector Exposure:** Implement constraints to limit risk concentration (e.g., "Max 20% Technology").
 * [x] **Unified Loop:** Refactor `runBacktest.ts` to load and trade multiple assets simultaneously.
-* [ ] **Goal:** A system that thinks in terms of a "Portfolio," not just individual stocks.
+* [x] **Goal:** A robust system that manages a "Portfolio" of assets with shared risk constraints.
 
 ### Phase 7: The Optimization Lab (Strategy Tuning)
 
