@@ -1,5 +1,5 @@
 import { Portfolio } from './portfolio';
-import { Strategy, Candle, BacktestResult, EquitySnapshot, Signal } from './types';
+import { Strategy, Candle, BacktestResult, EquitySnapshot, Signal, AssetMetadata } from './types';
 import { PerformanceAnalyzer } from './analysis';
 import { RiskManager } from './risk/risk_manager';
 import { calculateATR } from './indicators/atr';
@@ -12,18 +12,21 @@ export class Backtester {
   private analyzer: PerformanceAnalyzer;
   private riskManager?: RiskManager;
   private slippageModel: SlippageModel;
+  private metadataMap: Map<string, AssetMetadata>;
 
   constructor(
     strategy: Strategy,
     portfolio: Portfolio,
     riskManager?: RiskManager,
-    slippageModel?: SlippageModel
+    slippageModel?: SlippageModel,
+    metadataMap?: Map<string, AssetMetadata>
   ) {
     this.strategy = strategy;
     this.portfolio = portfolio;
     this.analyzer = new PerformanceAnalyzer();
     this.riskManager = riskManager;
     this.slippageModel = slippageModel || new ZeroSlippage();
+    this.metadataMap = metadataMap || new Map();
   }
 
   /**
@@ -47,6 +50,7 @@ export class Backtester {
     const initialCapital = this.portfolio.getState().cash;
     const equityCurve: EquitySnapshot[] = [];
     let highWaterMark = initialCapital;
+    let maxSectorExposureSeen = 0;
 
     // Pre-calculate ATR and Returns for all symbols (if Risk Manager enabled)
     const atrCache = new Map<string, (number | null)[]>();
@@ -203,6 +207,22 @@ export class Backtester {
                 const dynamicTP = this.riskManager.calculateBollingerTakeProfit(visibleHistory, 'BUY');
                 if (dynamicTP) finalSignal.takeProfit = dynamicTP;
              }
+
+             // --- Sector Exposure Check ---
+             const tradeValue = finalSignal.price * (finalSignal.quantity || 0);
+             const currentPositionValues = this.getCurrentPositionValues(universe, i);
+             
+             if (this.riskManager.checkSectorExposure(
+               sym, 
+               tradeValue, 
+               equity, 
+               currentPositionValues, 
+               this.metadataMap
+             )) {
+               finalSignal.action = 'HOLD';
+               finalSignal.reason = 'Sector Exposure Limit Breached';
+             }
+
           } else {
              finalSignal.quantity = Infinity; // Legacy All-In
           }
@@ -212,13 +232,23 @@ export class Backtester {
         this.portfolio.executeSignal(finalSignal, sym, this.strategy.name);
       } // End Symbol Loop
 
+      // 3. Post-Step Tracking
+      const stepTotalEquity = this.calculateTotalEquity(universe, i);
+      const sectorExposures = this.calculateSectorExposures(universe, i, stepTotalEquity);
+      for (const exposurePct of sectorExposures.values()) {
+        if (exposurePct > maxSectorExposureSeen) {
+          maxSectorExposureSeen = exposurePct;
+        }
+      }
+
       // Record Snapshot (End of Step)
-      this.recordSnapshot(timestamp, this.calculateTotalEquity(universe, i), equityCurve);
+      this.recordSnapshot(timestamp, stepTotalEquity, equityCurve);
 
     } // End Time Loop
 
     const trades = this.portfolio.getState().trades;
     const metrics = this.analyzer.calculateMetrics(initialCapital, equityCurve, trades);
+    metrics.maxSectorExposurePct = maxSectorExposureSeen;
 
     return {
       initialCapital,
@@ -227,6 +257,29 @@ export class Backtester {
       trades,
       equityCurve
     };
+  }
+
+  private calculateSectorExposures(universe: Map<string, Candle[]>, index: number, totalEquity: number): Map<string, number> {
+    const state = this.portfolio.getState();
+    const sectorValues = new Map<string, number>();
+
+    for (const [symbol, position] of state.positions) {
+      const sector = this.metadataMap.get(symbol)?.sector || 'Unknown';
+      const candles = universe.get(symbol);
+      const price = candles && candles[index] ? candles[index].close : position.averagePrice;
+      const value = position.quantity * price;
+      
+      sectorValues.set(sector, (sectorValues.get(sector) || 0) + value);
+    }
+
+    const exposures = new Map<string, number>();
+    if (totalEquity <= 0) return exposures;
+
+    for (const [sector, value] of sectorValues) {
+      exposures.set(sector, value / totalEquity);
+    }
+
+    return exposures;
   }
 
   private calculateTotalEquity(universe: Map<string, Candle[]>, index: number, useOpen = false): number {
@@ -252,5 +305,17 @@ export class Backtester {
       cash: this.portfolio.getState().cash,
       equity
     });
+  }
+
+  private getCurrentPositionValues(universe: Map<string, Candle[]>, index: number): Map<string, number> {
+    const state = this.portfolio.getState();
+    const values = new Map<string, number>();
+
+    for (const [symbol, position] of state.positions) {
+      const candles = universe.get(symbol);
+      const price = candles && candles[index] ? candles[index].close : position.averagePrice;
+      values.set(symbol, position.quantity * price);
+    }
+    return values;
   }
 }

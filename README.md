@@ -133,6 +133,33 @@ The system is composed of three decoupled domains:
     # Example: npm run backtest "CBA.AX,NAB.AX,WBC.AX" 2023-01-01 2024-01-01
     ```
 
+    **Example Output:**
+    ```text
+    =======================================
+    🏁 Backtest Complete: RSI Reversal
+    =======================================
+    Initial Capital:     $10000.00
+    Final Capital:       $10131.82
+    Total Return:        1.32%
+    Max Drawdown:        3.63%
+    Max Sector Exposure: 21.61%
+    Sharpe Ratio:        0.287
+    Win Rate:            57.14%
+    Total Trades:        17
+
+    📊 Final Portfolio: 100% Cash
+
+    📜 Trade History (Last 3 per symbol):
+      --- CBA.AX (Total Trades: 4) ---
+      [2025-11-18] BUY 10 @ $151.45
+      [2026-01-05] SELL 10 @ $156.63
+    ```
+
+    **Key Metrics:**
+    *   **Max Sector Exposure:** The highest percentage of your portfolio concentrated in a single sector (e.g., Banking) at any point. Used to verify diversification.
+    *   **Max Drawdown:** The largest peak-to-trough decline in portfolio value. Measures risk.
+    *   **Sharpe Ratio:** Risk-adjusted return. > 1.0 is good, > 2.0 is excellent.
+
 * **Paper Trading (Bot):**
 
     ```bash

@@ -1,5 +1,5 @@
 import { RiskManager } from '../risk/risk_manager';
-import { Candle, RiskConfig, Position } from '../types';
+import { Candle, Position, RiskConfig, Trade, AssetMetadata } from '../types';
 
 describe('RiskManager', () => {
   const defaultConfig: RiskConfig = {
@@ -244,6 +244,38 @@ describe('RiskManager', () => {
     portfolioUncorrelated.set('GLD', [0.05, 0.04, 0.03, 0.02, 0.01]); // Negative correlation
 
     expect(rm.checkCorrelation(candidateReturns, portfolioUncorrelated)).toBe(false); // No Breach
+  });
+
+  it('should detect sector exposure breach', () => {
+    const config: RiskConfig = {
+      ...defaultConfig,
+      maxSectorExposurePct: 0.2 // 20% limit
+    };
+    const rm = new RiskManager(config);
+    const totalEquity = 10000;
+    
+    const metadataMap = new Map<string, AssetMetadata>();
+    metadataMap.set('AAPL', { symbol: 'AAPL', sector: 'Tech' });
+    metadataMap.set('MSFT', { symbol: 'MSFT', sector: 'Tech' });
+    metadataMap.set('GLD', { symbol: 'GLD', sector: 'Commodities' });
+
+    const currentPositionValues = new Map<string, number>();
+    
+    // 1. Initial trade (15% of equity) -> OK
+    const tradeValue1 = 1500;
+    expect(rm.checkSectorExposure('AAPL', tradeValue1, totalEquity, currentPositionValues, metadataMap)).toBe(false);
+
+    // 2. Heavy initial trade (25% of equity) -> BREACH
+    const tradeValue2 = 2500;
+    expect(rm.checkSectorExposure('AAPL', tradeValue2, totalEquity, currentPositionValues, metadataMap)).toBe(true);
+
+    // 3. Already hold 15% in Tech, trying to buy 10% more MSFT (Total 25%) -> BREACH
+    currentPositionValues.set('AAPL', 1500); // 15% value
+    const tradeValue3 = 1000;
+    expect(rm.checkSectorExposure('MSFT', tradeValue3, totalEquity, currentPositionValues, metadataMap)).toBe(true);
+
+    // 4. Already hold 15% in Tech, buying 5% Gold (Different sector) -> OK
+    expect(rm.checkSectorExposure('GLD', 500, totalEquity, currentPositionValues, metadataMap)).toBe(false);
   });
 
   it('should calculate Bollinger Band Take Profit', () => {

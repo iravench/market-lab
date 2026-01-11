@@ -7,6 +7,7 @@ import { RiskManager } from '../logic/risk/risk_manager';
 import { calculateATR } from '../logic/indicators/atr';
 import { FixedPercentageSlippage } from '../logic/slippage';
 import { MarketDataProvider } from '../services/marketDataProvider';
+import { ASSET_METADATA_MAP } from '../config/assets';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -37,6 +38,7 @@ async function main() {
     adxThreshold: 25,
     dailyLossLimitPct: 0.02,
     maxCorrelation: 0.7,
+    maxSectorExposurePct: 0.2, // Max 20% per sector
     useBollingerTakeProfit: true
   };
   const riskManager = new RiskManager(riskConfig);
@@ -210,41 +212,75 @@ async function main() {
           if (correlationBreach) {
              console.log(`🛡️  Trade Filtered: Correlation limit exceeded.`);
           } else {
-            // Apply Slippage to Entry
-            const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, 0, latestCandle, 'BUY');
+            // --- SECTOR EXPOSURE CHECK ---
+            // 1. Fetch aligned data for prices (we need more than returns)
+            const allSymbols = [symbol, ...existingSymbols];
+            const alignedUniverse = await marketDataProvider.getAlignedCandles(allSymbols, '1d', startDate, endDate);
+            
+            // 2. Calculate Market Values for existing positions
+            const positionValues = new Map<string, number>();
+            for (const posSym of existingSymbols) {
+              const pos = state.positions.get(posSym);
+              if (!pos) continue;
+              
+              const candles = alignedUniverse.get(posSym);
+              const lastPrice = candles ? candles[candles.length - 1].close : pos.averagePrice;
+              positionValues.set(posSym, pos.quantity * lastPrice);
+            }
 
-            // Enhance BUY signal with Risk Unit sizing
+            // 3. Preliminary trade value
+            const preliminaryPrice = strategySignal.price;
             const atrSeries = calculateATR(candles, riskConfig.atrPeriod);
             const latestAtr = atrSeries[atrSeries.length - 1];
             const equity = portfolio.getTotalValue(latestCandle.close, symbol);
-
+            
+            let sectorBreach = false;
             if (latestAtr) {
               const stopLoss = riskManager.calculateATRStop(latestCandle.close, latestAtr, 'BUY');
-              const quantity = riskManager.calculatePositionSize(equity, execPrice, stopLoss);
+              const quantity = riskManager.calculatePositionSize(equity, preliminaryPrice, stopLoss);
+              const tradeValue = preliminaryPrice * quantity;
 
-              if (quantity > 0) {
-                finalSignal = {
-                  ...strategySignal,
-                  price: execPrice,
-                  quantity,
-                  stopLoss
-                };
-
-                // Dynamic Take Profit (Bollinger Bands)
-                if (riskConfig.useBollingerTakeProfit) {
-                  const dynamicTP = riskManager.calculateBollingerTakeProfit(candles, 'BUY');
-                  if (dynamicTP) {
-                    finalSignal.takeProfit = dynamicTP;
-                    console.log(`🎯 Dynamic Take Profit set to Upper Band: $${dynamicTP.toFixed(2)}`);
-                  }
-                }
-
-                console.log(`🛡️  Risk Sizing: Requested ${quantity} shares @ $${execPrice.toFixed(2)}, Stop Loss: $${stopLoss.toFixed(2)}`);
-              } else {
-                console.log('🛡️  Risk Sizing: Position size is 0. Skipping BUY.');
+              if (riskManager.checkSectorExposure(symbol, tradeValue, equity, positionValues, ASSET_METADATA_MAP)) {
+                console.log(`🛡️  Trade Filtered: Sector Exposure limit exceeded.`);
+                sectorBreach = true;
               }
+            }
+
+            if (sectorBreach) {
+              // Skip
             } else {
-              console.warn('⚠️  Could not calculate ATR for sizing. Skipping BUY.');
+              // Apply Slippage to Entry
+              const execPrice = slippageModel.calculateExecutionPrice(strategySignal.price, 0, latestCandle, 'BUY');
+
+              // Enhance BUY signal with Risk Unit sizing
+              if (latestAtr) {
+                const stopLoss = riskManager.calculateATRStop(latestCandle.close, latestAtr, 'BUY');
+                const quantity = riskManager.calculatePositionSize(equity, execPrice, stopLoss);
+
+                if (quantity > 0) {
+                  finalSignal = {
+                    ...strategySignal,
+                    price: execPrice,
+                    quantity,
+                    stopLoss
+                  };
+
+                  // Dynamic Take Profit (Bollinger Bands)
+                  if (riskConfig.useBollingerTakeProfit) {
+                    const dynamicTP = riskManager.calculateBollingerTakeProfit(candles, 'BUY');
+                    if (dynamicTP) {
+                      finalSignal.takeProfit = dynamicTP;
+                      console.log(`🎯 Dynamic Take Profit set to Upper Band: $${dynamicTP.toFixed(2)}`);
+                    }
+                  }
+
+                  console.log(`🛡️  Risk Sizing: Requested ${quantity} shares @ $${execPrice.toFixed(2)}, Stop Loss: $${stopLoss.toFixed(2)}`);
+                } else {
+                  console.log('🛡️  Risk Sizing: Position size is 0. Skipping BUY.');
+                }
+              } else {
+                console.warn('⚠️  Could not calculate ATR for sizing. Skipping BUY.');
+              }
             }
           }
         }

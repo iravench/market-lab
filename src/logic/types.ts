@@ -21,6 +21,11 @@ export interface Signal {
   quantity?: number;
 }
 
+export interface AssetMetadata {
+  symbol: string;
+  sector: string;
+}
+
 export interface RiskConfig {
   riskPerTradePct: number; // e.g. 0.01 for 1%
   maxDrawdownPct: number;  // e.g. 0.1 for 10%
@@ -31,6 +36,7 @@ export interface RiskConfig {
   adxPeriod?: number;       // Regime Detection (default 14)
   dailyLossLimitPct?: number; // Portfolio Guard (e.g. 0.02 for 2%)
   maxCorrelation?: number;    // Portfolio Guard (e.g. 0.7)
+  maxSectorExposurePct?: number; // Portfolio Guard (e.g. 0.2 for 20%)
   useBollingerTakeProfit?: boolean; // Dynamic Exit
 }
 
@@ -85,6 +91,7 @@ export interface BacktestMetrics {
   sharpeRatio: number;
   winRatePct: number;
   tradeCount: number;
+  maxSectorExposurePct?: number;
 }
 
 export interface BacktestResult {

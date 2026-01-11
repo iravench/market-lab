@@ -1,4 +1,4 @@
-import { Candle, Position, RiskConfig, SignalAction, Trade } from '../types';
+import { Candle, Position, RiskConfig, SignalAction, Trade, AssetMetadata } from '../types';
 import { calculateADX } from '../indicators/adx';
 import { calculateCorrelation } from '../math';
 import { calculateBollingerBands } from '../indicators/bollinger';
@@ -198,5 +198,40 @@ export class RiskManager {
     }
 
     return false;
+  }
+
+  /**
+   * Portfolio Guard: Sector Exposure Check.
+   * Ensures the portfolio doesn't over-concentrate in a single sector.
+   * 
+   * @param symbol Candidate symbol to buy
+   * @param tradeValue Dollar value of the intended trade
+   * @param totalEquity Current total portfolio value
+   * @param positionValues Map of symbol -> Current Market Value of holdings
+   * @param metadataMap Map of symbol -> metadata (sector)
+   * @returns true if sector limit is breached
+   */
+  public checkSectorExposure(
+    symbol: string,
+    tradeValue: number,
+    totalEquity: number,
+    positionValues: Map<string, number>,
+    metadataMap: Map<string, AssetMetadata>
+  ): boolean {
+    if (!this.config.maxSectorExposurePct || totalEquity <= 0) return false;
+
+    const candidateSector = metadataMap.get(symbol)?.sector || 'Unknown';
+    let sectorValue = tradeValue; // Start with the new trade
+
+    // Sum existing positions in the same sector
+    for (const [posSym, currentValue] of positionValues) {
+      const posSector = metadataMap.get(posSym)?.sector || 'Unknown';
+      if (posSector === candidateSector) {
+        sectorValue += currentValue;
+      }
+    }
+
+    const exposure = sectorValue / totalEquity;
+    return exposure > this.config.maxSectorExposurePct;
   }
 }
