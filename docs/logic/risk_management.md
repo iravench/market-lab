@@ -20,6 +20,14 @@ Static stop losses (e.g., "sell if down 5%") are brittle; they often trigger pre
 *   **ATR Trailing Stop:** A dynamic stop-loss that "ratchets" upwards as the price moves in the trade's favor.
 *   **Why:** It creates a "one-way valve" for profit accumulation. It allows winning trades to run (Slow) while cutting losing trades or reversals quickly (Fast) based on statistical volatility rather than arbitrary percentages.
 
+### 2.3 Dynamic Take Profits (Bollinger Bands)
+Unlike static targets (e.g., "Sell at +5%"), dynamic targets adjust to market volatility.
+
+*   **Mechanism:**
+    *   **BUY Trade:** Take Profit is set to the **Upper Bollinger Band** (SMA + 2σ) of the entry candle.
+    *   **SELL Trade:** Take Profit is set to the **Lower Bollinger Band** (SMA - 2σ).
+*   **Rationale:** The Upper Band represents a statistically "expensive" zone relative to the mean. Prices often revert from these levels, making them logical areas to secure profit in mean-reversion or trend-following systems.
+
 ## 3. Market Regime Filtering (Implemented)
 Strategies that work well in trending markets often fail in chopping (sideways) markets, and vice-versa. Applying the wrong strategy to the wrong environment is a primary source of drawdown.
 

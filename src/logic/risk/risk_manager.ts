@@ -1,12 +1,39 @@
 import { Candle, Position, RiskConfig, SignalAction, Trade } from '../types';
 import { calculateADX } from '../indicators/adx';
 import { calculateCorrelation } from '../math';
+import { calculateBollingerBands } from '../indicators/bollinger';
 
 export class RiskManager {
   public config: RiskConfig;
 
   constructor(config: RiskConfig) {
     this.config = config;
+  }
+
+  /**
+   * Calculates a dynamic Take Profit price based on Bollinger Bands.
+   * For BUY: Returns the Upper Band value of the latest candle.
+   * For SELL: Returns the Lower Band value of the latest candle.
+   */
+  public calculateBollingerTakeProfit(
+    candles: Candle[],
+    action: SignalAction,
+    period: number = 20,
+    multiplier: number = 2
+  ): number | null {
+    if (candles.length < period) return null;
+
+    const bands = calculateBollingerBands(candles, period, multiplier);
+    const lastUpper = bands.upper[bands.upper.length - 1];
+    const lastLower = bands.lower[bands.lower.length - 1];
+
+    if (action === 'BUY' && lastUpper !== null) {
+      return lastUpper;
+    } else if (action === 'SELL' && lastLower !== null) {
+      return lastLower;
+    }
+
+    return null;
   }
 
   /**

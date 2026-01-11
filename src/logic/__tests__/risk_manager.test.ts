@@ -242,4 +242,32 @@ describe('RiskManager', () => {
 
     expect(rm.checkCorrelation(candidateReturns, portfolioUncorrelated)).toBe(false); // No Breach
   });
+
+  it('should calculate Bollinger Band Take Profit', () => {
+    // Create 20 candles with prices moving up
+    const candles: Candle[] = [];
+    for (let i = 0; i < 20; i++) {
+      candles.push({
+        time: new Date(2023, 0, i + 1),
+        open: 10 + i, high: 12 + i, low: 8 + i, close: 10 + i, volume: 1000
+      });
+    }
+    // Prices: 10, 11, ..., 29.
+    // Mean (SMA20) = (10+29)/2 = 19.5
+    // StdDev of [10...29] is approx 5.766
+    // Upper Band = 19.5 + 2 * 5.766 = 31.03
+    // Lower Band = 19.5 - 2 * 5.766 = 7.97
+
+    // For BUY, we expect Upper Band
+    const tpBuy = riskManager.calculateBollingerTakeProfit(candles, 'BUY');
+    expect(tpBuy).toBeCloseTo(31.03, 1);
+
+    // For SELL, we expect Lower Band
+    const tpSell = riskManager.calculateBollingerTakeProfit(candles, 'SELL');
+    expect(tpSell).toBeCloseTo(7.97, 1);
+
+    // Not enough data (< 20 candles)
+    const fewCandles = candles.slice(0, 19);
+    expect(riskManager.calculateBollingerTakeProfit(fewCandles, 'BUY')).toBeNull();
+  });
 });
