@@ -217,4 +217,50 @@ describe('Backtester with Risk Management', () => {
     expect(resultUncorrelated.trades.length).toBe(1);
     expect(resultUncorrelated.trades[0].action).toBe('BUY');
   });
+
+  it('should apply Bollinger Band Take Profit if enabled', () => {
+    const portfolio = new Portfolio(10000);
+    const strategy = new MockStrategy();
+    const backtester = new Backtester(strategy, portfolio, 'AAPL', { ...riskConfig, useBollingerTakeProfit: true });
+
+    // Create candles with low variance
+    const prices = new Array(20).fill(100);
+    const candles = createCandles(prices.map(p => ({ h: p + 1, l: p - 1, c: p })));
+
+    // Trigger BUY on last candle
+    strategy.analyze = (c) => {
+      if (c.length === 20) return { action: 'BUY', price: 100, timestamp: c[19].time };
+      return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
+    };
+
+    // Mock RiskManager calculation (we can't easily mock private member, so rely on real calculation)
+    // Mean = 100. StdDev ~ 0.816 (for range 99-101?). 
+    // Wait, createCandles uses Close for SMA. Close is constant 100.
+    // StdDev of constant 100 is 0.
+    // So Upper Band = 100 + 2*0 = 100.
+    // Stop Loss is ATR based.
+
+    // Let's make prices move up so bands are distinct.
+    // 10, 11, ... 29.
+    const risingPrices = new Array(20).fill(0).map((_, i) => 10 + i);
+    const risingCandles = createCandles(risingPrices.map(p => ({ h: p + 1, l: p - 1, c: p })));
+
+    strategy.analyze = (c) => {
+      if (c.length === 20) return { action: 'BUY', price: 29, timestamp: c[19].time };
+      return { action: 'HOLD', price: c[c.length - 1].close, timestamp: c[c.length - 1].time };
+    };
+
+    const result = backtester.run(risingCandles);
+    const trade = result.trades[0];
+
+    // Check portfolio state for the position
+    const position = portfolio.getState().positions.get('AAPL');
+    expect(position).toBeDefined();
+    
+    // We expect TP to be set.
+    // Real calculation: Mean of 10..29 is 19.5.
+    // StdDev is 5.766.
+    // Upper Band = 19.5 + 2 * 5.766 = 31.03.
+    expect(position!.takeProfit).toBeCloseTo(31.03, 1);
+  });
 });

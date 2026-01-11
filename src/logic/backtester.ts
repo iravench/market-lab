@@ -214,6 +214,14 @@ export class Backtester {
 
           finalSignal.quantity = quantity;
           finalSignal.stopLoss = stopLoss;
+
+          // Dynamic Take Profit (Bollinger Bands)
+          if (this.riskManager.config.useBollingerTakeProfit) {
+            const dynamicTP = this.riskManager.calculateBollingerTakeProfit(visibleHistory, 'BUY');
+            if (dynamicTP) {
+              finalSignal.takeProfit = dynamicTP;
+            }
+          }
         } else {
           // Legacy / All-In Mode
           finalSignal.quantity = Infinity;

@@ -36,7 +36,8 @@ async function main() {
     trailingStop: true,
     adxThreshold: 25,
     dailyLossLimitPct: 0.02,
-    maxCorrelation: 0.7
+    maxCorrelation: 0.7,
+    useBollingerTakeProfit: true
   };
   const riskManager = new RiskManager(riskConfig);
 
@@ -243,6 +244,16 @@ async function main() {
                   quantity,
                   stopLoss
                 };
+
+                // Dynamic Take Profit (Bollinger Bands)
+                if (riskConfig.useBollingerTakeProfit) {
+                  const dynamicTP = riskManager.calculateBollingerTakeProfit(candles, 'BUY');
+                  if (dynamicTP) {
+                    finalSignal.takeProfit = dynamicTP;
+                    console.log(`🎯 Dynamic Take Profit set to Upper Band: $${dynamicTP.toFixed(2)}`);
+                  }
+                }
+
                 console.log(`🛡️  Risk Sizing: Requested ${quantity} shares @ $${execPrice.toFixed(2)}, Stop Loss: $${stopLoss.toFixed(2)}`);
               } else {
                 console.log('🛡️  Risk Sizing: Position size is 0. Skipping BUY.');

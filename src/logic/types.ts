@@ -31,6 +31,7 @@ export interface RiskConfig {
   adxPeriod?: number;       // Regime Detection (default 14)
   dailyLossLimitPct?: number; // Portfolio Guard (e.g. 0.02 for 2%)
   maxCorrelation?: number;    // Portfolio Guard (e.g. 0.7)
+  useBollingerTakeProfit?: boolean; // Dynamic Exit
 }
 
 /**
