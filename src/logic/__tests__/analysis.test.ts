@@ -102,4 +102,91 @@ describe('PerformanceAnalyzer', () => {
       expect(metrics.sharpeRatio).toBe(0);
     });
   });
+
+  describe('calculateSortinoRatio', () => {
+    it('should calculate Sortino ratio correctly', () => {
+      // Curve: 100 -> 110 (+10%) -> 100 (-9.09%) -> 110 (+10%)
+      const curve: EquitySnapshot[] = [
+        { equity: 100, timestamp: new Date(), cash: 0 },
+        { equity: 110, timestamp: new Date(), cash: 0 },
+        { equity: 100, timestamp: new Date(), cash: 0 },
+        { equity: 110, timestamp: new Date(), cash: 0 },
+      ];
+      const metrics = analyzer.calculateMetrics(100, curve, []);
+      // Mean Return: ~0.0363
+      // Downside Dev: ~0.0428
+      // Sortino: ~13.47
+      expect(metrics.sortinoRatio).toBeCloseTo(13.47, 1);
+    });
+
+    it('should return 0 for only positive returns', () => {
+      const curve: EquitySnapshot[] = [
+        { equity: 100, timestamp: new Date(), cash: 0 },
+        { equity: 110, timestamp: new Date(), cash: 0 },
+        { equity: 121, timestamp: new Date(), cash: 0 },
+      ];
+      // Negative returns: [0, 0]. StdDev = 0.
+      const metrics = analyzer.calculateMetrics(100, curve, []);
+      expect(metrics.sortinoRatio).toBe(0);
+    });
+  });
+
+  describe('calculateCalmarRatio', () => {
+    it('should calculate Calmar ratio correctly', () => {
+      // Initial 100, Final 110 after 126 days (approx half year)
+      // Annualized return should be roughly 21% ((1.1^2) - 1)
+      const curve: EquitySnapshot[] = Array.from({ length: 126 }, (_, i) => ({
+        equity: 100 + (i * 10 / 125),
+        timestamp: new Date(),
+        cash: 0
+      }));
+      // Max drawdown 10% (manual override to force a specific drawdown)
+      // At i=60, equity is normally ~104.8. We set to 90.
+      // Drawdown: (90 - 104.8) / 104.8 = ~-14.1%
+      curve[60].equity = 90;
+
+      const metrics = analyzer.calculateMetrics(100, curve, []);
+      // Annualized Ret: ~21%
+      // Max Drawdown: ~14.12%
+      // Calmar: 21 / 14.12 = ~1.48
+      expect(metrics.calmarRatio).toBeCloseTo(1.48, 1);
+    });
+  });
+
+  describe('calculateExpectancy', () => {
+    it('should calculate average PnL per trade', () => {
+      const trades: Trade[] = [
+        { action: 'SELL', realizedPnL: 100 } as Trade,
+        { action: 'SELL', realizedPnL: -50 } as Trade,
+      ];
+      const metrics = analyzer.calculateMetrics(100, [], trades);
+      expect(metrics.expectancy).toBe(25);
+    });
+  });
+
+  describe('calculateSQN', () => {
+    it('should calculate System Quality Number correctly', () => {
+      // 10 trades, all winning 100
+      const trades: Trade[] = Array.from({ length: 10 }, () => ({
+        action: 'SELL',
+        realizedPnL: 100
+      } as Trade));
+      const metrics = analyzer.calculateMetrics(100, [], trades);
+      // StdDev of [100, 100, ...] is 0. SQN should be 0 (handled by our code)
+      expect(metrics.sqn).toBe(0);
+
+      // Mixed trades
+      const mixedTrades: Trade[] = [
+        { action: 'SELL', realizedPnL: 200 } as Trade,
+        { action: 'SELL', realizedPnL: -100 } as Trade,
+        { action: 'SELL', realizedPnL: 200 } as Trade,
+        { action: 'SELL', realizedPnL: -100 } as Trade,
+      ];
+      // Mean: 50
+      // StdDev: 150
+      // SQN: sqrt(4) * (50 / 150) = 2 * 0.333 = 0.666
+      const mixedMetrics = analyzer.calculateMetrics(100, [], mixedTrades);
+      expect(mixedMetrics.sqn).toBeCloseTo(0.666, 2);
+    });
+  });
 });

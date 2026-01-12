@@ -12,10 +12,19 @@ export class PerformanceAnalyzer {
       ? equityCurve[equityCurve.length - 1].equity
       : initialCapital;
 
+    const totalReturnPct = this.calculateTotalReturn(initialCapital, finalCapital);
+    const maxDrawdownPct = this.calculateMaxDrawdown(equityCurve);
+    const days = equityCurve.length;
+    const annualizedReturnPct = this.calculateAnnualizedReturn(initialCapital, finalCapital, days);
+
     return {
-      totalReturnPct: this.calculateTotalReturn(initialCapital, finalCapital),
-      maxDrawdownPct: this.calculateMaxDrawdown(equityCurve),
+      totalReturnPct,
+      maxDrawdownPct,
       sharpeRatio: this.calculateSharpeRatio(equityCurve),
+      sortinoRatio: this.calculateSortinoRatio(equityCurve),
+      calmarRatio: this.calculateCalmarRatio(annualizedReturnPct, maxDrawdownPct),
+      expectancy: this.calculateExpectancy(trades),
+      sqn: this.calculateSQN(trades),
       winRatePct: this.calculateWinRate(trades),
       tradeCount: trades.length
     };
@@ -24,6 +33,14 @@ export class PerformanceAnalyzer {
   private calculateTotalReturn(initial: number, final: number): number {
     if (initial === 0) return 0;
     return ((final - initial) / initial) * 100;
+  }
+
+  private calculateAnnualizedReturn(initial: number, final: number, days: number): number {
+    if (initial === 0 || days === 0) return 0;
+    const totalReturn = final / initial;
+    // Assume 252 trading days in a year
+    const years = days / 252;
+    return (Math.pow(totalReturn, 1 / years) - 1) * 100;
   }
 
   private calculateMaxDrawdown(equityCurve: EquitySnapshot[]): number {
@@ -36,7 +53,6 @@ export class PerformanceAnalyzer {
       }
 
       const drawdown = (snapshot.equity - peak) / peak;
-      // drawdown is negative (or 0). We want the magnitude (e.g. -0.20 -> 20%)
       if (drawdown < maxDrawdown) {
         maxDrawdown = drawdown;
       }
@@ -48,7 +64,59 @@ export class PerformanceAnalyzer {
   private calculateSharpeRatio(equityCurve: EquitySnapshot[]): number {
     if (equityCurve.length < 2) return 0;
 
-    // 1. Calculate Daily Returns
+    const returns: number[] = this.calculateDailyReturns(equityCurve);
+    if (returns.length === 0) return 0;
+
+    const mean = calculateMean(returns);
+    const stdDev = calculateStandardDeviation(returns);
+
+    if (stdDev < 1e-9) return 0;
+
+    return (mean / stdDev) * Math.sqrt(252);
+  }
+
+  private calculateSortinoRatio(equityCurve: EquitySnapshot[]): number {
+    if (equityCurve.length < 2) return 0;
+
+    const returns: number[] = this.calculateDailyReturns(equityCurve);
+    if (returns.length === 0) return 0;
+
+    const mean = calculateMean(returns);
+    const negativeReturns = returns.map(r => Math.min(0, r));
+    const downsideDev = calculateStandardDeviation(negativeReturns);
+
+    if (downsideDev < 1e-9) return 0;
+
+    return (mean / downsideDev) * Math.sqrt(252);
+  }
+
+  private calculateCalmarRatio(annualizedReturnPct: number, maxDrawdownPct: number): number {
+    if (maxDrawdownPct === 0) return 0;
+    return annualizedReturnPct / maxDrawdownPct;
+  }
+
+  private calculateExpectancy(trades: Trade[]): number {
+    const closedTrades = trades.filter(t => t.action === 'SELL' && t.realizedPnL !== undefined);
+    if (closedTrades.length === 0) return 0;
+
+    const totalPnL = closedTrades.reduce((sum, t) => sum + (t.realizedPnL || 0), 0);
+    return totalPnL / closedTrades.length;
+  }
+
+  private calculateSQN(trades: Trade[]): number {
+    const closedTrades = trades.filter(t => t.action === 'SELL' && t.realizedPnL !== undefined);
+    if (closedTrades.length < 2) return 0;
+
+    const pnls = closedTrades.map(t => t.realizedPnL || 0);
+    const mean = calculateMean(pnls);
+    const stdDev = calculateStandardDeviation(pnls);
+
+    if (stdDev < 1e-9) return 0;
+
+    return Math.sqrt(closedTrades.length) * (mean / stdDev);
+  }
+
+  private calculateDailyReturns(equityCurve: EquitySnapshot[]): number[] {
     const returns: number[] = [];
     for (let i = 1; i < equityCurve.length; i++) {
       const prev = equityCurve[i - 1].equity;
@@ -56,19 +124,7 @@ export class PerformanceAnalyzer {
       if (prev === 0) continue;
       returns.push((curr - prev) / prev);
     }
-
-    if (returns.length === 0) return 0;
-
-    // 2. Mean and StdDev using shared math utils
-    const mean = calculateMean(returns);
-    const stdDev = calculateStandardDeviation(returns);
-
-    if (stdDev < 1e-9) return 0;
-
-    // 3. Annualize (Assuming daily data)
-    // Sharpe = (Mean - RiskFree) / StdDev * sqrt(252)
-    // We assume RiskFree = 0 for simplicity
-    return (mean / stdDev) * Math.sqrt(252);
+    return returns;
   }
 
   private calculateWinRate(trades: Trade[]): number {

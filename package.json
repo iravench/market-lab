@@ -11,6 +11,8 @@
     "backtest": "ts-node src/scripts/runBacktest.ts",
     "trade": "ts-node src/scripts/trade.ts",
     "create-portfolio": "ts-node src/scripts/createPortfolio.ts",
+    "optimize": "ts-node src/scripts/optimize.ts",
+    "walk-forward": "ts-node src/scripts/walkForward.ts",
     "test": "jest"
   },
   "keywords": [],

@@ -64,12 +64,14 @@ The system is composed of three decoupled domains:
 * [x] **Unified Loop:** Refactor `runBacktest.ts` to load and trade multiple assets simultaneously.
 * [x] **Goal:** A robust system that manages a "Portfolio" of assets with shared risk constraints.
 
-### Phase 7: The Optimization Lab (Strategy Tuning)
+### Phase 7: The Optimization Lab (Strategy Tuning) (Partially Completed)
 
-* [ ] **Metric Expansion:** Implement Calmar Ratio, Sortino Ratio, and SQN to measure stability.
-* [ ] **Experiment Persistence:** Create a DB table (`backtest_runs`) to log every simulation result.
-* [ ] **The Automator:** Build a CLI tool for Bayesian/Grid search optimization with Walk-Forward Validation.
-* [ ] **Goal:** A data-driven research lab to find robust, stable strategy parameters.
+* [x] **Metric Expansion:** Implement Calmar Ratio, Sortino Ratio, and SQN to measure stability.
+* [x] **Experiment Persistence:** Create a DB table (`backtest_runs`) to log every simulation result.
+* [x] **The Automator:** Build a CLI tool for Grid/Random search optimization.
+* [x] **The Validator:** Build Walk-Forward Analysis engine to ensure stability.
+* [ ] **The AI:** Upgrade optimization to use Bayesian methods (Pending).
+* [x] **Goal:** A data-driven research lab to find robust, stable strategy parameters.
 
 ## 5. Getting Started
 
@@ -159,6 +161,54 @@ The system is composed of three decoupled domains:
     *   **Max Sector Exposure:** The highest percentage of your portfolio concentrated in a single sector (e.g., Banking) at any point. Used to verify diversification.
     *   **Max Drawdown:** The largest peak-to-trough decline in portfolio value. Measures risk.
     *   **Sharpe Ratio:** Risk-adjusted return. > 1.0 is good, > 2.0 is excellent.
+
+* **Run Optimization:**
+
+    ```bash
+    # Create a config file (e.g., config.json)
+    npm run optimize config.json
+    ```
+
+    **Example `config.json`:**
+    ```json
+    {
+      "strategyName": "RsiStrategy",
+      "assets": ["CBA.AX"],
+      "startDate": "2023-01-01",
+      "endDate": "2024-01-01",
+      "objective": "sharpeRatio",
+      "searchMethod": "grid",
+      "parameters": {
+        "period": { "min": 10, "max": 20, "step": 5, "type": "integer" },
+        "buyThreshold": { "min": 25, "max": 35, "step": 5, "type": "integer" }
+      }
+    }
+    ```
+
+* **Run Walk-Forward Analysis:**
+
+    ```bash
+    npm run walk-forward wf_config.json
+    ```
+
+    **Example `wf_config.json`:**
+    ```json
+    {
+      "strategyName": "RsiStrategy",
+      "assets": ["CBA.AX"],
+      "startDate": "2023-01-01",
+      "endDate": "2026-01-01",
+      "trainWindowDays": 180,
+      "testWindowDays": 90,
+      "anchored": false,
+      "objective": "sharpeRatio",
+      "searchMethod": "grid",
+      "parameters": {
+        "period": { "min": 10, "max": 20, "step": 5, "type": "integer" },
+        "buyThreshold": { "min": 25, "max": 35, "step": 5, "type": "integer" }
+      }
+    }
+    ```
 
 * **Paper Trading (Bot):**
 

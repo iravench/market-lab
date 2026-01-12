@@ -89,6 +89,10 @@ export interface BacktestMetrics {
   totalReturnPct: number;
   maxDrawdownPct: number;
   sharpeRatio: number;
+  sortinoRatio: number;
+  calmarRatio: number;
+  expectancy: number;
+  sqn: number;
   winRatePct: number;
   tradeCount: number;
   maxSectorExposurePct?: number;
