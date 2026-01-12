@@ -13,6 +13,7 @@
     "create-portfolio": "ts-node src/scripts/createPortfolio.ts",
     "optimize": "ts-node src/scripts/optimize.ts",
     "walk-forward": "ts-node src/scripts/walkForward.ts",
+    "profile-asset": "ts-node src/scripts/profileAsset.ts",
     "test": "jest"
   },
   "keywords": [],

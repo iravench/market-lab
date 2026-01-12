@@ -142,3 +142,73 @@ Bollinger Bands consist of a middle band (SMA) and two outer bands that are stan
 ### How to use it
 *   **Volatility Squeeze:** When bands are very thin, it indicates low volatility and often precedes a major price breakout.
 *   **Overextended:** Prices touching or exceeding the outer bands are statistically overextended and may revert to the mean.
+
+---
+
+## 8. On-Balance Volume (OBV)
+
+### What is it?
+OBV is a momentum indicator that uses volume flow to predict changes in stock price. It assumes that volume precedes price.
+
+### The Math
+$$
+OBV_t = 
+\begin{cases} 
+OBV_{t-1} + Volume_t & \text{if } Close_t > Close_{t-1} \\
+OBV_{t-1} - Volume_t & \text{if } Close_t < Close_{t-1} \\
+OBV_{t-1} & \text{if } Close_t = Close_{t-1}
+\end{cases}
+$$
+
+### How to use it
+*   **Confirmation:** If price rises but OBV is flat or falling, the trend lacks conviction (divergence).
+*   **Breakouts:** OBV often breaks trendline resistance *before* price does.
+
+---
+
+## 9. Volume Weighted Average Price (VWAP)
+
+### What is it?
+VWAP is the average price a security has traded at throughout the day (or period), based on both volume and price. It provides a benchmark for the "true" average price paid by participants.
+
+### The Math
+$$ VWAP = \frac{\sum (TypicalPrice \times Volume)}{\sum Volume} $$
+Where $TypicalPrice = (High + Low + Close) / 3$.
+
+### How to use it
+*   **Institutional Benchmark:** Buying below VWAP is considered a "good value" entry; selling above is a "good exit."
+*   **Trend Filter:** If Price > VWAP, the short-term trend is bullish.
+
+---
+
+## 10. Money Flow Index (MFI)
+
+### What is it?
+MFI is often called "Volume-weighted RSI." It measures buying and selling pressure between 0 and 100.
+
+### The Math
+1.  **Money Flow (MF):** $TypicalPrice \times Volume$
+2.  **Positive MF:** Sum of MF for days where Typical Price rose.
+3.  **Negative MF:** Sum of MF for days where Typical Price fell.
+4.  **Money Flow Ratio:** $PositiveMF / NegativeMF$
+5.  **MFI:** $100 - \frac{100}{1 + MoneyFlowRatio}$
+
+### How to use it
+*   **Oversold/Overbought:** Like RSI, MFI < 20 is oversold, MFI > 80 is overbought.
+*   **Volume Divergence:** If price hits a new high but MFI fails to exceed its previous high, it indicates the rally is running on "fumes" (low volume).
+
+---
+
+## 11. Donchian Channels
+
+### What is it?
+Donchian Channels are formed by taking the highest high and the lowest low of the last $N$ periods. They identify the current trading range and potential breakouts.
+
+### The Math
+*   **Upper Channel:** $\max(High_{t-N} \dots High_{t-1})$
+*   **Lower Channel:** $\min(Low_{t-N} \dots Low_{t-1})$
+*   **Middle Channel:** $(Upper + Lower) / 2$
+
+### How to use it
+*   **Breakouts:** A close above the Upper Channel is a classic "Turtle Trading" buy signal (new N-day High).
+*   **Trend Filter:** Price staying persistently above the Middle Channel indicates a strong uptrend.

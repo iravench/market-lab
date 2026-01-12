@@ -6,6 +6,9 @@ import { Portfolio } from '../portfolio';
 import { RiskManager } from '../risk/risk_manager';
 import { RsiStrategy } from '../strategies/rsiStrategy';
 import { EmaAdxStrategy } from '../strategies/emaAdxStrategy';
+import { VolatilityBreakoutStrategy } from '../strategies/volatilityBreakoutStrategy';
+import { BollingerMeanReversionStrategy } from '../strategies/bollingerStrategy';
+import { BuyAndHoldStrategy } from '../strategies/buyAndHoldStrategy';
 import { Candle, RiskConfig } from '../types';
 
 // Strategy Registry
@@ -14,6 +17,12 @@ const STRATEGY_REGISTRY: Record<string, any> = {
   'RSI Reversal': RsiStrategy,
   'EmaAdxStrategy': EmaAdxStrategy,
   'EMA-ADX Trend Follower': EmaAdxStrategy,
+  'VolatilityBreakoutStrategy': VolatilityBreakoutStrategy,
+  'Volatility Breakout': VolatilityBreakoutStrategy,
+  'BollingerMeanReversionStrategy': BollingerMeanReversionStrategy,
+  'Bollinger Mean Reversion (Vol)': BollingerMeanReversionStrategy,
+  'BuyAndHoldStrategy': BuyAndHoldStrategy,
+  'Buy & Hold': BuyAndHoldStrategy,
 };
 
 export class OptimizationRunner {

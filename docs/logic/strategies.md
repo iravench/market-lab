@@ -78,3 +78,61 @@ interface EmaAdxStrategyConfig {
 #### Strategic Value
 This strategy is designed to capture the "meat" of a move while staying in cash during sideways, choppy markets where crossovers frequently fail.
 
+---
+
+### Volatility Breakout (`VolatilityBreakoutStrategy`)
+
+A breakout strategy that aims to capture explosive moves using Donchian Channels and volume confirmation.
+
+#### Logic
+*   **Buy Signal:** When Close Price > Previous N-day High (Upper Donchian Channel) **AND** Volume > 1.5x Average Volume.
+*   **Sell Signal:** When Close Price < Previous N-day Low (Lower Donchian Channel). This acts as a trailing stop.
+
+#### Configuration
+```typescript
+interface VolatilityBreakoutConfig {
+    donchianPeriod: number;   // Lookback for High/Low (default: 20)
+    volumeSmaPeriod: number;  // Lookback for Avg Volume (default: 20)
+    volumeMultiplier: number; // Factor for Volume Confirmation (default: 1.5)
+}
+```
+
+#### Best For
+"Explosive" regimes where price moves are sharp and sustained.
+
+---
+
+### Bollinger Mean Reversion (`BollingerMeanReversionStrategy`)
+
+An enhanced mean-reversion strategy that combines Bollinger Bands with Money Flow Index (MFI).
+
+#### Logic
+*   **Buy Signal:** Price < Lower Band **AND** MFI < 20 (Oversold).
+*   **Sell Signal:** Price > Upper Band **OR** MFI > 80 (Overbought).
+
+#### Configuration
+```typescript
+interface BollingerMeanReversionConfig {
+    bbPeriod: number;        // Bollinger Band Period (default: 20)
+    bbMultiplier: number;    // Std Dev Multiplier (default: 2)
+    mfiPeriod: number;       // MFI Period (default: 14)
+    mfiBuyThreshold: number; // Oversold Level (default: 20)
+}
+```
+
+#### Best For
+"Range Bound" or "Mean Reverting" regimes where price oscillates within a channel.
+
+---
+
+### Buy & Hold (`BuyAndHoldStrategy`)
+
+The baseline benchmark strategy.
+
+#### Logic
+*   **Buy Signal:** Always returns BUY. (Execution engine handles single entry).
+*   **Sell Signal:** Never.
+
+#### Best For
+"Bull Markets" where market beta outperforms active management. Used as the control group for profiling.
+
