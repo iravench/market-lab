@@ -55,3 +55,26 @@ interface RsiStrategyConfig {
 | Market Crash | 25.0 | 30 / 70 | **BUY** | `RSI (25.00) < 30` |
 | Bull Run | 85.0 | 30 / 70 | **SELL** | `RSI (85.00) > 70` |
 | Sideways | 50.0 | 30 / 70 | **HOLD** | `RSI (50.00) is neutral` |
+
+### EMA-ADX Trend Follower (`EmaAdxStrategy`)
+
+A trend-following strategy that uses Exponential Moving Average (EMA) crossovers for entry/exit and the Average Directional Index (ADX) as a strength filter.
+
+#### Logic
+*   **Buy Signal:** When the Fast EMA crosses *above* the Slow EMA AND the ADX is above a specific threshold (e.g., 25). This indicates momentum is shifting upwards and the trend is strong enough to avoid a whipsaw.
+*   **Sell Signal:** When the Fast EMA crosses *below* the Slow EMA. This indicates the trend is losing steam or reversing.
+*   **Hold:** In all other cases (neutral, weak trend, or no recent crossover).
+
+#### Configuration
+```typescript
+interface EmaAdxStrategyConfig {
+    fastPeriod: number;   // Period for the fast EMA (default: 9)
+    slowPeriod: number;   // Period for the slow EMA (default: 21)
+    adxPeriod: number;    // Lookback for ADX calculation (default: 14)
+    adxThreshold: number; // Minimum trend strength to enter (default: 25)
+}
+```
+
+#### Strategic Value
+This strategy is designed to capture the "meat" of a move while staying in cash during sideways, choppy markets where crossovers frequently fail.
+

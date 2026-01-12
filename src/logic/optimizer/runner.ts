@@ -5,12 +5,15 @@ import { Backtester } from '../backtester';
 import { Portfolio } from '../portfolio';
 import { RiskManager } from '../risk/risk_manager';
 import { RsiStrategy } from '../strategies/rsiStrategy';
+import { EmaAdxStrategy } from '../strategies/emaAdxStrategy';
 import { Candle, RiskConfig } from '../types';
 
 // Strategy Registry
 const STRATEGY_REGISTRY: Record<string, any> = {
   'RsiStrategy': RsiStrategy,
   'RSI Reversal': RsiStrategy,
+  'EmaAdxStrategy': EmaAdxStrategy,
+  'EMA-ADX Trend Follower': EmaAdxStrategy,
 };
 
 export class OptimizationRunner {
