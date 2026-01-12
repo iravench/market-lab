@@ -1,6 +1,7 @@
 import { OptimizationConfig, Optimizer } from './types';
 import { GridOptimizer } from './gridOptimizer';
 import { RandomOptimizer } from './randomOptimizer';
+import { TpeOptimizer } from './tpeOptimizer';
 
 export class OptimizerFactory {
   static create(config: OptimizationConfig): Optimizer {
@@ -10,7 +11,7 @@ export class OptimizerFactory {
       case 'random':
         return new RandomOptimizer(config);
       case 'bayesian':
-        throw new Error('Bayesian optimization not yet implemented. Use "random" or "grid".');
+        return new TpeOptimizer(config);
       default:
         throw new Error(`Unknown search method: ${config.searchMethod}`);
     }

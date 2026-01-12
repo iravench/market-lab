@@ -55,72 +55,76 @@ export class OptimizationRunner {
           throw new Error(`No data found for [${config.startDate} -> ${config.endDate}]`);
         }
     
-        while (true) {      iteration++;
-      const params = optimizer.getNextParams(optimizerHistory);
-      
-      if (!params) {
-        break;
-      }
+        // Define the "Single Test" logic as a reusable function
+        const runSingleTest = async (params: ParameterSet): Promise<BacktestRun> => {
+          iteration++;
+          if (logProgress) {
+            process.stdout.write(`\r🔄 Iteration ${iteration}: Testing ${JSON.stringify(params)}...`);
+          }
 
-      if (logProgress) {
-        process.stdout.write(`\r🔄 Iteration ${iteration}: Testing ${JSON.stringify(params)}...`);
-      }
+          const strategy = new StrategyClass(params);
+          const portfolio = new Portfolio(10000); // Fixed 10k
+          
+          const riskConfig: RiskConfig = {
+             riskPerTradePct: params['riskPerTrade'] || 0.01,
+             maxDrawdownPct: 0.1,
+             atrMultiplier: 2.0,
+             atrPeriod: 14,
+             trailingStop: true,
+          };
+          
+          const riskManager = new RiskManager(riskConfig);
+          const backtester = new Backtester(strategy, portfolio, riskManager);
 
-      // --- Run Backtest ---
-      const strategy = new StrategyClass(params);
-      const portfolio = new Portfolio(10000); // Fixed 10k
-      
-      const riskConfig: RiskConfig = {
-         riskPerTradePct: params['riskPerTrade'] || 0.01,
-         maxDrawdownPct: 0.1,
-         atrMultiplier: 2.0,
-         atrPeriod: 14,
-         trailingStop: true,
-      };
-      
-      const riskManager = new RiskManager(riskConfig);
-      const backtester = new Backtester(strategy, portfolio, riskManager);
+          const result = backtester.run(activeUniverse);
 
-      let result;
-      try {
-        result = backtester.run(activeUniverse);
-      } catch (e: any) {
-        console.error(`\n❌ Backtest Failed: ${e.message}`);
-        continue;
-      }
+          const startDate = new Date(config.startDate);
+          const endDate = new Date(config.endDate);
 
-      // --- Save Result ---
-      const startDate = new Date(config.startDate);
-      const endDate = new Date(config.endDate);
+          const runId = await this.backtestRepo.saveRun(
+            config.strategyName,
+            params,
+            result.metrics,
+            startDate,
+            endDate,
+            gitCommit
+          );
 
-      const runId = await this.backtestRepo.saveRun(
-        config.strategyName,
-        params,
-        result.metrics,
-        startDate,
-        endDate,
-        gitCommit
-      );
+          const runRecord: BacktestRun = {
+            id: runId,
+            strategy_name: config.strategyName,
+            parameters: params,
+            metrics: result.metrics,
+            time_range_start: startDate,
+            time_range_end: endDate,
+            git_commit: gitCommit,
+            created_at: new Date()
+          };
 
-      const runRecord: BacktestRun = {
-        id: runId,
-        strategy_name: config.strategyName,
-        parameters: params,
-        metrics: result.metrics,
-        time_range_start: startDate,
-        time_range_end: endDate,
-        git_commit: gitCommit,
-        created_at: new Date()
-      };
+          if (logProgress) {
+            const objectiveValue = (result.metrics as any)[config.objective];
+            process.stdout.write(` Done. ${config.objective}: ${objectiveValue?.toFixed(3)}\n`);
+          }
 
-      history.push(runRecord);
-      optimizerHistory.push(runRecord);
+          return runRecord;
+        };
 
-      if (logProgress) {
-        const objectiveValue = (result.metrics as any)[config.objective];
-        process.stdout.write(` Done. ${config.objective}: ${objectiveValue?.toFixed(3)}\n`);
-      }
-    }
+        // --- Execution Logic ---
+        
+        // Check if Optimizer supports Delegate Mode (e.g. Bayesian)
+        if (optimizer.runDelegate) {
+           return await optimizer.runDelegate(runSingleTest);
+        }
+
+        // Default Iterative Mode (Grid/Random)
+        while (true) {
+          const params = optimizer.getNextParams(optimizerHistory);
+          if (!params) break;
+
+          const runRecord = await runSingleTest(params);
+          history.push(runRecord);
+          optimizerHistory.push(runRecord);
+        }
 
     return history;
   }

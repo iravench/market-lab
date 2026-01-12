@@ -31,8 +31,15 @@ export interface ParameterSet {
 
 export interface Optimizer {
   /**
-   * Generates the next set of parameters to test.
+   * Generates the next set of parameters to test. (Iterative Mode)
    * Returns null if the search space is exhausted or max iterations reached.
    */
   getNextParams(history: BacktestRun[]): ParameterSet | null;
+
+  /**
+   * Takes over the optimization loop. (Delegate Mode)
+   */
+  runDelegate?(
+    runner: (params: ParameterSet) => Promise<BacktestRun>
+  ): Promise<BacktestRun[]>;
 }
