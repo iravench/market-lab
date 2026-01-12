@@ -1,14 +1,20 @@
 # Gemini Context: Market Lab
 
-## 1. Context Loading Strategy
-*   **Primary Source:** `README.md` contains the active Roadmap, Philosophy, and "Follow the Loop" guidelines. **Read it first.**
-*   **Knowledge Base:** `docs/` contains the source of truth for Math, Design, and Logic. Consult specific files in `docs/` before implementing related features.
+## 1. Ground Truth
+- **`README.md`**: Active Roadmap & Project Philosophy.
+- **`docs/`**: Source of truth for math, design, and logic.
 
-## 2. Agent Workflow Mandates
-*   **Milestone Awareness:** Always identify the current active Roadmap phase from `README.md`.
-*   **Doc-Driven Dev:** If a task involves new logic (math, strategy), ensure it is documented in `docs/` *before* or *during* implementation.
-*   **Testing:** `src/logic/` is the core. All changes there require unit tests.
+## 2. Core Loop (Mandates)
+1. **Milestone First**: Identify active Phase in `README.md`. No phase = no dev.
+2. **Doc-Driven**: Document new logic in `docs/` *before* implementation.
+3. **Logic Testing**: All code in `src/logic/` requires unit tests. No exceptions.
+4. **Zero Regression**: `npm test` must pass before every commit.
 
-## 3. Quick References
-*   `src/logic/` -> Pure functions (Indicators, Math).
-*   `src/scripts/` -> CLI Entry points.
+## 3. Structure
+- `src/logic/`: Pure functions (Indicators, Math, Strategies).
+- `src/scripts/`: CLI tools.
+- `src/db/`: Persistence & Migrations.
+
+## 4. Documentation Strategy
+- Explain **WHY** in comments; explain **MATH/LOGIC** in `docs/`.
+- Treat documentation as a first-class citizen.

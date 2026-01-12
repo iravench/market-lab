@@ -18,7 +18,26 @@ The system is composed of three decoupled domains:
 2. **Strategy Core (The Brain):** Pure functions that accept data and return signals/decisions, independent of execution details.
 3. **Execution & Ledger (The Hands):** A double-entry accounting system to track orders, positions, and balances (simulated or real).
 
-## 4. Roadmap & Milestones
+## 4. Strategy Library
+
+The engine comes with built-in strategies that implement the `Strategy` interface. These can be used in backtests, optimizations, and live trading.
+
+### 1. RSI Reversal (`RsiStrategy`)
+*   **Type:** Mean Reversion
+*   **Logic:**
+    *   **BUY** when RSI < `buyThreshold` (default 30).
+    *   **SELL** when RSI > `sellThreshold` (default 70).
+*   **Best For:** Choppy / Sideways markets.
+
+### 2. EMA-ADX Trend Follower (`EmaAdxStrategy`)
+*   **Type:** Trend Following
+*   **Logic:**
+    *   **BUY** on Golden Cross (Fast EMA > Slow EMA) **AND** ADX > `adxThreshold` (Strong Trend).
+    *   **SELL** on Death Cross (Fast EMA < Slow EMA).
+*   **Best For:** Trending markets.
+*   **Notes:** The ADX filter prevents buying into false breakouts during chop.
+
+## 5. Roadmap & Milestones
 
 ### Phase 1: The Data Foundation
 
@@ -80,7 +99,7 @@ The system is composed of three decoupled domains:
 * [ ] **Regime Classifier:** Implement logic to automatically categorize market states (Trending vs. Choppy).
 * [ ] **Goal:** Systematically identify which strategies work for which stocks based on historical regime bias.
 
-## 5. Getting Started
+## 6. Getting Started
 
 ### Prerequisites
 
@@ -178,6 +197,8 @@ The system is composed of three decoupled domains:
 
     **Recommended Search Method:** Use `"searchMethod": "bayesian"` (TPE). It is significantly more efficient than Grid Search, finding optimal parameters in 10-20% of the iterations.
 
+    **Available Strategies:** `RsiStrategy`, `EmaAdxStrategy`
+
     **Example `config.json`:**
     ```json
     {
@@ -234,28 +255,4 @@ The system is composed of three decoupled domains:
     npm run trade <PORTFOLIO_ID> CBA.AX LIVE
     ```
 
-## 6. Development Guidelines
 
-### Follow the loop
-
-Always try to understand what the current phase and mileston is. If there is none, we should not be developing. Make sure new development phases and milestones are documented under the roadmap section.
-
-After aquiring the current milestone, we double check and try to understand relevant documentations under `docs`, and update/add new necessary documents when missing, for the current milestone, so we always work with complete and refresh context in mind.
-
-Then we should try to analyze and break down the milestone into a workable sized todo list, and work down the list. Follow the loop: work on the item -> document anything new -> add unit tests -> make sure all tests are passed -> git commit.
-
-After a milestone is delivered, ensure it's well documented under relevant sections under `docs`, and marked it off from the roadmap section.
-
-### Documentation Strategy
-
-We treat documentation as a first-class citizen.
-
-* **`docs/`:** This folder contains the **Knowledge Base**.
-  * **Concepts:** If we implement a financial algorithm (like RSI), we document the *math* and *theory* in `docs/logic/`.
-  * **Design:** Architectural decisions (like Schema Design) go in `docs/design/`.
-* **Code Comments:** Focus on *why*, not *what*. Complex math should reference the `docs/` files.
-
-### Testing Policy
-
-* **Logic Core:** All indicators and strategy logic must have unit tests (`src/logic/__tests__`).
-* **Zero Regression:** Ensure `npm test` passes before committing logic changes.
