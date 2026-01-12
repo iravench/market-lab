@@ -73,6 +73,13 @@ The system is composed of three decoupled domains:
 * [x] **The AI:** Implement native **Tree-structured Parzen Estimator (TPE)** for efficient Bayesian optimization.
 * [x] **Goal:** A data-driven research lab to find robust, stable strategy parameters.
 
+### Phase 8: Asset Intelligence & Regime Profiling (Proposed)
+
+* [ ] **Canonical Suite:** Implement a standardized set of strategies (Trend, Mean Reversion, Breakout) for fingerprinting.
+* [ ] **Multi-Year Profiler:** Build a tool to run meta-analysis across multiple years to detect "Asset Personality."
+* [ ] **Regime Classifier:** Implement logic to automatically categorize market states (Trending vs. Choppy).
+* [ ] **Goal:** Systematically identify which strategies work for which stocks based on historical regime bias.
+
 ## 5. Getting Started
 
 ### Prerequisites
