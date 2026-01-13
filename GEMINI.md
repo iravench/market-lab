@@ -21,3 +21,6 @@ Always start with establishing ground truth by ingesting following sources:
 ## 4. Documentation Strategy
 - Explain **WHY** in comments, short and concise.
 - Document without low level implementation details in `docs/`.
+
+## 5. Other Rules
+- Use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.

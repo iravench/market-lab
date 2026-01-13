@@ -28,20 +28,23 @@ The `RegimeProfiler` performs the following steps for a given asset (e.g., `CBA.
 1.  **Window Slicing:** The history is divided into Annual Windows (e.g., 2023, 2024, 2025).
 2.  **Bayesian Optimization (TPE):**
     *   For each window, **ALL** canonical strategies are optimized using TPE (Tree-structured Parzen Estimator).
-    *   We search for the parameters that maximize Sharpe Ratio for that specific year.
+    *   We search for the parameters that maximize the chosen **Objective** (default: `sharpeRatio`).
 3.  **Classification:**
-    *   The strategy with the highest Sharpe Ratio "wins" that year.
-    *   **Tie-Breaker:** If `BuyAndHold` Sharpe > 2.5 and > Trend Sharpe, we classify as `BULL_MARKET`.
-    *   **Filter:** If the best strategy has Sharpe < 0.5, the year is classified as `CHOPPY` (untradeable).
+    *   The results are passed to a **RegimeClassifier** specific to the objective.
+    *   **Sharpe Classifier:**
+        *   If `BuyAndHold` Sharpe > 2.5 and > Trend Sharpe, we classify as `BULL_MARKET`.
+        *   If the best strategy has Sharpe < 0.5, the year is classified as `CHOPPY`.
+    *   **Generic Classifier (e.g., Calmar/Sortino):**
+        *   Winner takes all if above a quality threshold (e.g., 0.5).
 
 ## 4. Usage
 
 Run the profiler via CLI:
 
 ```bash
-npm run profile-asset <SYMBOL> <START_DATE> <END_DATE>
+npm run profile-asset <SYMBOL> <START_DATE> <END_DATE> [--objective=metric]
 # Example
-npm run profile-asset CBA.AX 2020-01-01 2024-01-01
+npm run profile-asset CBA.AX 2020-01-01 2024-01-01 -- --objective=calmarRatio
 ```
 
 ### Example Output
