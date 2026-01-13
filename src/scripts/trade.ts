@@ -1,5 +1,5 @@
 import { PersistentPortfolio } from '../logic/persistentPortfolio';
-import { RsiStrategy } from '../logic/strategies/rsiStrategy';
+import { STRATEGY_REGISTRY } from '../logic/strategies/registry';
 import pool from '../db';
 import yahooFinance from 'yahoo-finance2';
 import { Candle, Signal, RiskConfig } from '../logic/types';
@@ -11,16 +11,26 @@ import { ASSET_METADATA_MAP } from '../config/assets';
 
 async function main() {
   const args = process.argv.slice(2);
-  // Usage: npm run trade <PORTFOLIO_ID> <SYMBOL> <MODE: DRY|LIVE>
+  // Usage: npm run trade <PORTFOLIO_ID> <SYMBOL> <MODE: DRY|LIVE> [STRATEGY_NAME]
   if (args.length < 3) {
-    console.error('Usage: npm run trade <PORTFOLIO_ID> <SYMBOL> <MODE: DRY|LIVE>');
+    console.error('Usage: npm run trade <PORTFOLIO_ID> <SYMBOL> <MODE: DRY|LIVE> [STRATEGY_NAME]');
     process.exit(1);
   }
 
-  const [portfolioId, symbol, mode] = args;
+  const [portfolioId, symbol, mode, strategyNameArg] = args;
   const isLive = mode.toUpperCase() === 'LIVE';
 
+  const strategyName = strategyNameArg || 'RsiStrategy';
+  const StrategyClass = STRATEGY_REGISTRY[strategyName];
+
+  if (!StrategyClass) {
+    console.error(`❌ Unknown Strategy: "${strategyName}"`);
+    console.error('Available Strategies:', Object.keys(STRATEGY_REGISTRY).join(', '));
+    process.exit(1);
+  }
+
   console.log(`🤖 Starting Bot for ${symbol}`);
+  console.log(`🧠 Strategy: ${strategyName}`);
   console.log(`📂 Portfolio: ${portfolioId}`);
   console.log(`⚠️  Mode: ${mode.toUpperCase()}`);
 
@@ -166,7 +176,7 @@ async function main() {
 
     // 4. Run Strategy Logic (if no risk exit triggered and not in skip mode)
     if (!finalSignal && !skipStrategy) {
-      const strategy = new RsiStrategy({ period: 14, buyThreshold: 30, sellThreshold: 70 });
+      const strategy = new StrategyClass({}); // Use defaults for now
       const strategySignal = strategy.analyze(candles);
 
       console.log(`\n💡 Strategy Signal: ${strategySignal.action} @ $${strategySignal.price.toFixed(2)}`);
@@ -183,7 +193,7 @@ async function main() {
 
           if (existingSymbols.length > 0 && riskConfig.maxCorrelation) {
             console.log(`🔎 Checking correlation with portfolio: ${existingSymbols.join(', ')}`);
-            
+
             // Use MarketDataProvider to get aligned returns for all symbols
             const allSymbols = [symbol, ...existingSymbols];
             const alignedReturns = await marketDataProvider.getAlignedReturns(allSymbols, '1d', startDate, endDate);
@@ -211,19 +221,19 @@ async function main() {
           }
 
           if (correlationBreach) {
-             console.log(`🛡️  Trade Filtered: Correlation limit exceeded.`);
+            console.log(`🛡️  Trade Filtered: Correlation limit exceeded.`);
           } else {
             // --- SECTOR EXPOSURE CHECK ---
             // 1. Fetch aligned data for prices (we need more than returns)
             const allSymbols = [symbol, ...existingSymbols];
             const alignedUniverse = await marketDataProvider.getAlignedCandles(allSymbols, '1d', startDate, endDate);
-            
+
             // 2. Calculate Market Values for existing positions
             const positionValues = new Map<string, number>();
             for (const posSym of existingSymbols) {
               const pos = state.positions.get(posSym);
               if (!pos) continue;
-              
+
               const candles = alignedUniverse.get(posSym);
               const lastPrice = candles ? candles[candles.length - 1].close : pos.averagePrice;
               positionValues.set(posSym, pos.quantity * lastPrice);
@@ -234,7 +244,7 @@ async function main() {
             const atrSeries = calculateATR(candles, riskConfig.atrPeriod);
             const latestAtr = atrSeries[atrSeries.length - 1];
             const equity = portfolio.getTotalValue(latestCandle.close, symbol);
-            
+
             let sectorBreach = false;
             if (latestAtr) {
               const stopLoss = riskManager.calculateATRStop(latestCandle.close, latestAtr, 'BUY');
@@ -295,7 +305,7 @@ async function main() {
     if (finalSignal && finalSignal.action !== 'HOLD') {
       if (isLive) {
         console.log(`🚀 Executing LIVE ${finalSignal.action} trade @ $${finalSignal.price.toFixed(2)}...`);
-        await portfolio.executeSignal(finalSignal, symbol, 'RsiStrategy');
+        await portfolio.executeSignal(finalSignal, symbol, strategyName);
         console.log('✅ Trade executed successfully.');
 
         const newState = portfolio.getState();

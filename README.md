@@ -158,9 +158,16 @@ The engine comes with built-in strategies that implement the `Strategy` interfac
 * **Run Backtest:**
 
     ```bash
-    npm run backtest <SYMBOLS_CSV> <START> <END>
-    # Example: npm run backtest "CBA.AX,NAB.AX,WBC.AX" 2023-01-01 2024-01-01
+    npm run backtest <SYMBOLS_CSV> <START> <END> [STRATEGY_NAME]
+    # Example: npm run backtest "CBA.AX,NAB.AX" 2023-01-01 2024-01-01 "RsiStrategy"
     ```
+
+    **Available Strategies:**
+    *   `RsiStrategy` (Default)
+    *   `EmaAdxStrategy`
+    *   `VolatilityBreakoutStrategy`
+    *   `BollingerMeanReversionStrategy`
+    *   `BuyAndHoldStrategy`
 
     **Example Output:**
     ```text
@@ -250,10 +257,10 @@ The engine comes with built-in strategies that implement the `Strategy` interfac
     npm run create-portfolio "My Bot" 10000
 
     # 2. Run a Dry Run (No DB updates)
-    npm run trade <PORTFOLIO_ID> CBA.AX DRY
-
+    npm run trade <PORTFOLIO_ID> <SYMBOL> DRY [STRATEGY_NAME]
+    
     # 3. Run Live (Updates DB)
-    npm run trade <PORTFOLIO_ID> CBA.AX LIVE
+    npm run trade <PORTFOLIO_ID> <SYMBOL> LIVE [STRATEGY_NAME]
     ```
-
-
+    
+    *Note: Defaults to `RsiStrategy` if `STRATEGY_NAME` is omitted.*

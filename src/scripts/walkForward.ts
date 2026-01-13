@@ -7,13 +7,8 @@ import { OptimizationRunner } from '../logic/optimizer/runner';
 import { Candle, RiskConfig } from '../logic/types';
 import { Portfolio } from '../logic/portfolio';
 import { Backtester } from '../logic/backtester';
-import { RsiStrategy } from '../logic/strategies/rsiStrategy';
+import { STRATEGY_REGISTRY } from '../logic/strategies/registry';
 import { RiskManager } from '../logic/risk/risk_manager';
-
-const STRATEGY_REGISTRY: Record<string, any> = {
-  'RsiStrategy': RsiStrategy,
-  'RSI Reversal': RsiStrategy,
-};
 
 async function main() {
   const configFile = process.argv[2];

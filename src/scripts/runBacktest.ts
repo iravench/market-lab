@@ -1,7 +1,7 @@
 import { CandleRepository } from '../db/repository';
 import { Backtester } from '../logic/backtester';
 import { Portfolio } from '../logic/portfolio';
-import { RsiStrategy } from '../logic/strategies/rsiStrategy';
+import { STRATEGY_REGISTRY } from '../logic/strategies/registry';
 import { RiskConfig, Candle } from '../logic/types';
 import { FixedPercentageSlippage } from '../logic/slippage';
 import { MarketDataProvider } from '../services/marketDataProvider';
@@ -13,18 +13,54 @@ async function main() {
 
   const args = process.argv.slice(2);
   if (args.length < 3) {
-    console.error('Usage: npm run backtest <SYMBOLS_CSV> <START_DATE> <END_DATE>');
-    console.error('Example: npm run backtest "BTC-USD,ETH-USD" 2023-01-01 2023-12-31');
+    console.error('Usage: npm run backtest <SYMBOLS_CSV> <START_DATE> <END_DATE> [STRATEGY_NAME]');
+    console.error('Example: npm run backtest "BTC-USD,ETH-USD" 2023-01-01 2023-12-31 "RsiStrategy"');
+    console.error('Available Strategies:', Object.keys(STRATEGY_REGISTRY).join(', '));
     process.exit(1);
   }
 
-  const [symbolsArg, startStr, endStr] = args;
-  const symbols = symbolsArg.split(',').map(s => s.trim());
+  const [symbolsArg, startStr, endStr, strategyNameArg] = args;
+  
+  if (!symbolsArg || symbolsArg.trim() === '') {
+    console.error('❌ Error: Symbols argument cannot be empty.');
+    process.exit(1);
+  }
+
+  const symbols = symbolsArg.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  if (symbols.length === 0) {
+    console.error('❌ Error: No valid symbols provided.');
+    process.exit(1);
+  }
+
   const startDate = new Date(startStr);
   const endDate = new Date(endStr);
+
+  if (isNaN(startDate.getTime())) {
+    console.error(`❌ Error: Invalid Start Date "${startStr}". Use YYYY-MM-DD format.`);
+    process.exit(1);
+  }
+  if (isNaN(endDate.getTime())) {
+    console.error(`❌ Error: Invalid End Date "${endStr}". Use YYYY-MM-DD format.`);
+    process.exit(1);
+  }
+  if (startDate >= endDate) {
+    console.error('❌ Error: Start Date must be before End Date.');
+    process.exit(1);
+  }
+
   const interval = '1d'; // Default to daily for now
+  
+  const strategyName = strategyNameArg || 'RsiStrategy';
+  const StrategyClass = STRATEGY_REGISTRY[strategyName];
+
+  if (!StrategyClass) {
+    console.error(`❌ Unknown Strategy: "${strategyName}"`);
+    console.error('Available Strategies:', Object.keys(STRATEGY_REGISTRY).join(', '));
+    process.exit(1);
+  }
 
   console.log(`🚀 Starting Backtest for Universe: ${symbols.join(', ')}`);
+  console.log(`🧠 Strategy: ${strategyName}`);
   console.log(`📅 Period: ${startDate.toDateString()} - ${endDate.toDateString()}`);
 
   try {
@@ -49,7 +85,9 @@ async function main() {
     // 2. Setup Components
     const initialCapital = 10000;
     const portfolio = new Portfolio(initialCapital, { fixed: 10 }); // $10 commission per trade
-    const strategy = new RsiStrategy({ period: 14, buyThreshold: 30, sellThreshold: 70 });
+    
+    // Instantiate Strategy (default params)
+    const strategy = new StrategyClass({}); 
 
     const riskConfig: RiskConfig = {
       riskPerTradePct: 0.01, // 1%
