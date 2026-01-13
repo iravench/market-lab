@@ -68,3 +68,14 @@ Acknowledging that "Paper Prices" are not "Real Prices." The system simulates fr
 *   **Formula:** Execution Price = $Price \pm (\text{Candle Range} \times \text{Factor})$
     *   Where Candle Range = High - Low.
 *   **Rationale:** During a crash (high volatility), liquidity dries up, and you are more likely to get filled far from your stop price. This model penalizes trading during chaos.
+
+## 6. Liquidity & Volume Guards (Implemented)
+To prevent "Ghost Fills" in backtesting (simulating trades that are mathematically impossible given historical volume), we strictly enforce participation limits.
+
+*   **Volume Participation Limit:**
+    *   **Mechanism:** For every trade (Buy or Sell), the order quantity is clamped to a percentage of the candle's total volume (e.g., 10%).
+    *   **Formula:** `MaxQty = Candle.Volume * volumeLimitPct`.
+    *   **Outcome:** 
+        *   If `OrderQty > MaxQty`, only `MaxQty` is filled (Partial Fill).
+        *   If `Candle.Volume == 0`, the trade is skipped entirely.
+    *   **Rationale:** Ensures strategies don't "fake" performance by dumping millions of shares into illiquid penny stocks or during after-hours sessions with zero volume.

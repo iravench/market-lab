@@ -96,7 +96,7 @@ The engine comes with built-in strategies that implement the `Strategy` interfac
 
 * [x] **Market Physics (Volume):** Implement OBV, VWAP, and MFI to measure move conviction.
 * [x] **The "Canonical" Suite:** Implement standardized strategies (Trend, Mean Reversion, Volatility Breakout, Buy & Hold) as behavior benchmarks.
-* [ ] **Liquidity Guards:** Upgrade strategies to respect volume limits (avoiding "ghost" fills).
+* [x] **Liquidity Guards:** Upgrade strategies to respect volume limits (avoiding "ghost" fills).
 * [x] **Regime Profiler:** Build a tool to run multi-year meta-analysis to fingerprint "Asset Personality" (Trending vs. Choppy).
 * [ ] **Goal:** A system that understands *what* an asset is (Regime) and *how* it moves (Volume), ensuring we only deploy strategies in their winning environments.
 

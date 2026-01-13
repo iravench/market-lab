@@ -37,6 +37,7 @@ export interface RiskConfig {
   dailyLossLimitPct?: number; // Portfolio Guard (e.g. 0.02 for 2%)
   maxCorrelation?: number;    // Portfolio Guard (e.g. 0.7)
   maxSectorExposurePct?: number; // Portfolio Guard (e.g. 0.2 for 20%)
+  volumeLimitPct?: number;       // Liquidity Guard (e.g. 0.1 for 10% of candle volume)
   useBollingerTakeProfit?: boolean; // Dynamic Exit
 }
 

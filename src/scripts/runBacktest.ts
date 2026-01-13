@@ -61,6 +61,7 @@ async function main() {
       dailyLossLimitPct: 0.02, // 2% Daily Loss Limit
       maxCorrelation: 0.7,   // Portfolio Guard
       maxSectorExposurePct: 0.2, // Max 20% per sector
+      volumeLimitPct: 0.1, // Liquidity Guard
       useBollingerTakeProfit: true
     };
     const riskManager = new RiskManager(riskConfig);

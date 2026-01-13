@@ -83,6 +83,12 @@ export class OptimizationRunner {
              atrMultiplier: 2.0,
              atrPeriod: 14,
              trailingStop: true,
+             adxThreshold: 25,
+             dailyLossLimitPct: 0.02,
+             maxCorrelation: 0.7,
+             maxSectorExposurePct: 0.2,
+             volumeLimitPct: 0.1, // Liquidity Guard
+             useBollingerTakeProfit: true
           };
           
           const riskManager = new RiskManager(riskConfig);

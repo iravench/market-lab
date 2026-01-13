@@ -128,25 +128,37 @@ export class Portfolio {
   }
 
   public sell(symbol: string, signal: Signal): void {
-    const { price, timestamp } = signal;
+    const { price, timestamp, quantity } = signal;
     const position = this.positions.get(symbol);
     if (!position || position.quantity <= 0) return;
 
-    const quantity = position.quantity;
-    const details = this.calculateSellDetails(quantity, price, position.averagePrice);
+    // Determine quantity to sell: Use signal quantity if valid, else sell all.
+    // Also clamp to position quantity.
+    let quantityToSell = position.quantity;
+    if (quantity !== undefined && quantity > 0) {
+      quantityToSell = Math.min(quantity, position.quantity);
+    }
+
+    const details = this.calculateSellDetails(quantityToSell, price, position.averagePrice);
     if (!details) return;
 
     const { fee, totalCredit, realizedPnL } = details;
 
     this.cash += totalCredit;
-    this.positions.delete(symbol);
+
+    // Update position
+    if (quantityToSell >= position.quantity) {
+      this.positions.delete(symbol);
+    } else {
+      position.quantity -= quantityToSell;
+    }
 
     this.trades.push({
       timestamp,
       symbol,
       action: 'SELL',
       price,
-      quantity,
+      quantity: quantityToSell,
       fee,
       totalValue: totalCredit,
       realizedPnL

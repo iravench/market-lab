@@ -124,13 +124,22 @@ export class Backtester {
             if (exitReason) {
               const basePrice = exitReason === 'STOP_LOSS' ? position.stopLoss! : position.takeProfit!;
               const execPrice = this.slippageModel.calculateExecutionPrice(basePrice, position.quantity, currentCandle, 'SELL');
-              this.portfolio.sell(sym, {
+              
+              const exitSignal: Signal = {
                 action: 'SELL',
                 price: execPrice,
                 timestamp: currentCandle.time,
                 reason: exitReason
-              });
-              continue; // Position closed, skip strategy for this symbol this turn
+              };
+
+              // Liquidity Guard (Risk Exit)
+              if (this.riskManager.config.volumeLimitPct) {
+                const maxQty = Math.floor(currentCandle.volume * this.riskManager.config.volumeLimitPct);
+                exitSignal.quantity = maxQty; // Portfolio.sell will clamp this to position size
+              }
+
+              this.portfolio.sell(sym, exitSignal);
+              continue; // Position processed (closed or partially closed)
             }
 
             // Update Trailing Stop
@@ -225,6 +234,23 @@ export class Backtester {
 
           } else {
              finalSignal.quantity = Infinity; // Legacy All-In
+          }
+        }
+
+        // Liquidity Guard (Strategy Entry/Exit)
+        if (this.riskManager && this.riskManager.config.volumeLimitPct && finalSignal.action !== 'HOLD') {
+          const maxQty = Math.floor(currentCandle.volume * this.riskManager.config.volumeLimitPct);
+          const proposedQty = finalSignal.quantity ?? Infinity;
+
+          // Clamp
+          finalSignal.quantity = Math.min(proposedQty, maxQty);
+
+          if (finalSignal.quantity === 0) {
+            finalSignal.action = 'HOLD';
+            finalSignal.reason = 'Liquidity Guard (Zero Volume)';
+          } else if (finalSignal.quantity < proposedQty && proposedQty !== Infinity) {
+             const note = `Liquidity Guard (Partial Fill: ${finalSignal.quantity})`;
+             finalSignal.reason = finalSignal.reason ? `${finalSignal.reason} | ${note}` : note;
           }
         }
 
