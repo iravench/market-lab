@@ -1,8 +1,13 @@
 # Market Lab: Algorithmic Backtesting & Paper Trading Engine
 
 ## 1. Mission
+**Market Lab** is a robust, modular financial simulation engine designed to master market mechanics and investment strategies. It prioritizes "Slow is Fast" development—focusing on correctness, verification, and deep architectural understanding over rapid feature delivery.
 
-To master financial market mechanics and investment strategies by building a robust, verifiable simulation engine from the ground up. This project serves as both a technical playground (TypeScript/Node.js) and a financial learning tool.
+The system serves as a "Time Machine" and "Sandboxed Exchange," allowing users to:
+1.  **Backtest** strategies against historical data (verify logic).
+2.  **Optimize** parameters to find stable configurations.
+3.  **Profile** assets to understand their market regime (Trend vs. Chop).
+4.  **Paper Trade** in real-time to validate execution and psychology.
 
 ## 2. Core Philosophy
 
@@ -10,32 +15,35 @@ To master financial market mechanics and investment strategies by building a rob
 * **Verification First:** No real money is risked until strategies are proven via rigorous backtesting and paper trading.
 * **Modularity:** The system is built "bit by bit," allowing development to pause and resume without context loss.
 
-## 3. Architecture Overview
+## 3. Architecture
+The system follows a strict separation of concerns:
 
-The system is composed of three decoupled domains:
+### 3.1. Data Ingestion (The Source)
+*   **`src/services/marketDataProvider.ts`:** Fetches data, handles normalization, and alignment.
+*   **`src/db/`:** Repository layer abstracting TimescaleDB interactions.
+*   **Schema:** Universal OHLCV format, using `TIMESTAMPTZ` for UTC alignment and `NUMERIC` for precision.
 
-1. **Data Ingestion (The Source):** Reliable ETL pipelines to fetch, normalize, and store time-series market data (OHLCV).
-2. **Strategy Core (The Brain):** Pure functions that accept data and return signals/decisions, independent of execution details.
-3. **Execution & Ledger (The Hands):** A double-entry accounting system to track orders, positions, and balances (simulated or real).
+### 3.2. Strategy Core (The Brain)
+*   **`src/logic/strategies/`:** Pure logic modules implementing the `Strategy` interface.
+    *   **Registry:** `src/logic/strategies/registry.ts` maps names (e.g., "RsiStrategy") to implementations.
+    *   **Strategies:** `RsiStrategy`, `EmaAdxStrategy`, `VolatilityBreakoutStrategy`, etc.
+*   **`src/logic/indicators/`:** Math libraries (SMA, EMA, RSI, ATR, etc.) as pure functions.
 
-## 4. Strategy Library
+### 3.3. Execution & Risk (The Hands & The Shield)
+*   **`src/logic/backtester.ts`:** Event loop simulating time travel. Replays history candle-by-candle.
+*   **`src/logic/portfolio.ts`:** Ledger system tracking cash, positions, and equity. Supports partial fills.
+*   **`src/logic/risk/risk_manager.ts`:** The "Gatekeeper." Enforces:
+    *   **Transactional Risk:** Position sizing (Risk Unit), Stop Loss, Trailing Stops.
+    *   **Systemic Risk:** Max Drawdown, Daily Loss Limits.
+    *   **Portfolio Risk:** Sector Exposure, Correlation checks.
+    *   **Liquidity Guards:** Volume Participation Limits (new in Phase 8).
 
-The engine comes with built-in strategies that implement the `Strategy` interface. These can be used in backtests, optimizations, and live trading.
-
-### 1. RSI Reversal (`RsiStrategy`)
-*   **Type:** Mean Reversion
-*   **Logic:**
-    *   **BUY** when RSI < `buyThreshold` (default 30).
-    *   **SELL** when RSI > `sellThreshold` (default 70).
-*   **Best For:** Choppy / Sideways markets.
-
-### 2. EMA-ADX Trend Follower (`EmaAdxStrategy`)
-*   **Type:** Trend Following
-*   **Logic:**
-    *   **BUY** on Golden Cross (Fast EMA > Slow EMA) **AND** ADX > `adxThreshold` (Strong Trend).
-    *   **SELL** on Death Cross (Fast EMA < Slow EMA).
-*   **Best For:** Trending markets.
-*   **Notes:** The ADX filter prevents buying into false breakouts during chop.
+## 4. Key Technologies
+*   **Language:** TypeScript (Node.js v18+) - chosen for type safety and ubiquity.
+*   **Database:** TimescaleDB (PostgreSQL extension) - optimized for time-series OHLCV data.
+*   **Containerization:** Docker & Docker Compose - manages the database infrastructure.
+*   **Testing:** Jest - enforces the "Verification First" mandate with unit and integration tests.
+*   **Data Source:** Yahoo Finance (via `yahoo-finance2`) - for historical and live market data.
 
 ## 5. Roadmap & Milestones
 
