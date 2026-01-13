@@ -32,6 +32,7 @@ export interface AssetProfileRecord {
   winning_score: number;
   optimization_id: string | null;
   details: Record<string, number>;
+  meta: Record<string, any>;
 }
 
 export class BacktestRepository {
@@ -120,9 +121,10 @@ export class BacktestRepository {
         winning_strategy,
         winning_score,
         optimization_id,
-        details
+        details,
+        meta
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id
     `;
     
@@ -134,7 +136,8 @@ export class BacktestRepository {
       profile.winning_strategy,
       profile.winning_score,
       profile.optimization_id || null,
-      profile.details
+      profile.details,
+      profile.meta || {}
     ]);
     
     return result.rows[0].id;

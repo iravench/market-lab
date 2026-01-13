@@ -21,6 +21,7 @@ export interface WindowProfile {
   details: {
     [strategy: string]: number; // Scores based on chosen objective
   };
+  meta: Record<string, any>;
 }
 
 export class RegimeProfiler {
@@ -43,7 +44,6 @@ export class RegimeProfiler {
       console.log(`\n🔍 Profiling ${symbol} for ${window.year} (Objective: ${objective})...`);
       
       // Run Optimizations
-      // We need to capture both the score AND the optimization ID
       const trendRes = await this.optimizeTrend(symbol, window.start, window.end, objective);
       const mrRes = await this.optimizeMeanReversion(symbol, window.start, window.end, objective);
       const breakoutRes = await this.optimizeBreakout(symbol, window.start, window.end, objective);
@@ -56,6 +56,13 @@ export class RegimeProfiler {
         'BuyHold': buyHoldRes.score
       };
 
+      const optimizations: Record<string, string | null> = {
+        [trendRes.strategyName]: trendRes.optimizationId,
+        [mrRes.strategyName]: mrRes.optimizationId,
+        [breakoutRes.strategyName]: breakoutRes.optimizationId,
+        [buyHoldRes.strategyName]: buyHoldRes.optimizationId
+      };
+
       // Delegate classification
       const result = classifier.classify(scores);
 
@@ -66,6 +73,8 @@ export class RegimeProfiler {
       else if (result.winner === 'Volatility Breakout') winningOptId = breakoutRes.optimizationId;
       else if (result.winner === 'Buy & Hold') winningOptId = buyHoldRes.optimizationId;
 
+      const meta = { optimizations };
+
       const profile: WindowProfile = {
         year: window.year,
         startDate: window.start,
@@ -74,7 +83,8 @@ export class RegimeProfiler {
         winningScore: result.winningScore,
         optimizationId: winningOptId,
         regime: result.regime,
-        details: scores
+        details: scores,
+        meta
       };
 
       // Persist to DB if repo is available
@@ -87,7 +97,8 @@ export class RegimeProfiler {
           winning_strategy: result.winner,
           winning_score: result.winningScore,
           optimization_id: winningOptId,
-          details: scores
+          details: scores,
+          meta
         });
       }
 
@@ -129,7 +140,7 @@ export class RegimeProfiler {
 
   // --- Optimization Helpers ---
 
-  private async optimizeTrend(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null}> {
+  private async optimizeTrend(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null, strategyName: string}> {
     const config: OptimizationConfig = {
       strategyName: 'EmaAdxStrategy',
       assets: [symbol],
@@ -147,7 +158,7 @@ export class RegimeProfiler {
     return this.getBestResult(config);
   }
 
-  private async optimizeMeanReversion(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null}> {
+  private async optimizeMeanReversion(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null, strategyName: string}> {
     const config: OptimizationConfig = {
       strategyName: 'BollingerMeanReversionStrategy',
       assets: [symbol],
@@ -164,7 +175,7 @@ export class RegimeProfiler {
     return this.getBestResult(config);
   }
 
-  private async optimizeBreakout(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null}> {
+  private async optimizeBreakout(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null, strategyName: string}> {
     const config: OptimizationConfig = {
       strategyName: 'VolatilityBreakoutStrategy',
       assets: [symbol],
@@ -181,7 +192,7 @@ export class RegimeProfiler {
     return this.getBestResult(config);
   }
 
-  private async runBuyAndHold(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null}> {
+  private async runBuyAndHold(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null, strategyName: string}> {
     // Single iteration
     const config: OptimizationConfig = {
       strategyName: 'BuyAndHoldStrategy',
@@ -196,11 +207,11 @@ export class RegimeProfiler {
     return this.getBestResult(config);
   }
 
-  private async getBestResult(config: OptimizationConfig): Promise<{score: number, optimizationId: string | null}> {
+  private async getBestResult(config: OptimizationConfig): Promise<{score: number, optimizationId: string | null, strategyName: string}> {
     try {
         // Run with logging disabled to avoid spamming stdout
         const runs = await this.runner.run(config, 'profiler', false);
-        if (runs.length === 0) return { score: -999, optimizationId: null };
+        if (runs.length === 0) return { score: -999, optimizationId: null, strategyName: config.strategyName };
         
         let maxScore = -999;
         const objective = config.objective;
@@ -214,11 +225,11 @@ export class RegimeProfiler {
                 maxScore = score;
             }
         }
-        return { score: maxScore, optimizationId: optId };
+        return { score: maxScore, optimizationId: optId, strategyName: config.strategyName };
     } catch (error) {
         // e.g. No data
         console.warn(`Optimization failed for ${config.strategyName}: ${error}`);
-        return { score: -999, optimizationId: null };
+        return { score: -999, optimizationId: null, strategyName: config.strategyName };
     }
   }
   
