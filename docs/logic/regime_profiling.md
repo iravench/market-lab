@@ -63,7 +63,22 @@ npm run profile-asset CBA.AX 2020-01-01 2024-01-01 -- --objective=calmarRatio
 └──────┴─────────────────────┴───────────────────────┴────────┘
 ```
 
-## 5. Strategic Implication
+## 5. Data Persistence & Memory
+
+The system maintains a full lineage of every profiling session to ensure reproducibility and traceability.
+
+### 5.1. Hierarchy
+1.  **Optimizations (`optimizations`):** A parent record capturing the intent (Config, Objective, Git Commit) and status of a session.
+2.  **Backtest Runs (`backtest_runs`):** Child records containing the specific parameters and metrics for every iteration attempted during the optimization.
+3.  **Asset Profiles (`asset_profiles`):** The final "Memory Ledger." It stores the conclusion (Regime) for a specific Asset + Year + Metric, linked via foreign key (`optimization_id`) to the exact strategy run that proved it.
+
+### 5.2. Traceability
+This architecture allows us to answer:
+*   *"Why was CBA.AX classified as BULL_MARKET in 2024?"* -> Query `asset_profiles`.
+*   *"What strategy parameters achieved that result?"* -> Follow `optimization_id` to `backtest_runs`.
+*   *"What code version produced this?"* -> Follow `optimization_id` to `optimizations.git_commit`.
+
+## 6. Strategic Implication
 
 Once an asset is profiled:
 *   **Trending Assets:** Deploy `EmaAdxStrategy` or Breakout logic.

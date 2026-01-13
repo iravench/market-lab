@@ -29,6 +29,30 @@ export class OptimizationRunner {
       throw new Error(`Unknown Strategy: ${config.strategyName}`);
     }
 
+    // 1. Create Optimization Record (Parent)
+    // Define consistent RiskConfig for this session
+    const riskConfig: RiskConfig = {
+      riskPerTradePct: 0.01, // Note: Params can override this locally, but this is the baseline
+      maxDrawdownPct: 0.1,
+      atrMultiplier: 2.0,
+      atrPeriod: 14,
+      trailingStop: true,
+      adxThreshold: 25,
+      dailyLossLimitPct: 0.02,
+      maxCorrelation: 0.7,
+      maxSectorExposurePct: 0.2,
+      volumeLimitPct: 0.1,
+      useBollingerTakeProfit: true
+    };
+
+    const optimizationId = await this.backtestRepo.createOptimization(
+      config.strategyName,
+      config,
+      riskConfig,
+      gitCommit
+    );
+
+    try {
         // Filter universe to match config assets AND time range
         const activeUniverse = new Map<string, Candle[]>();
         const start = new Date(config.startDate);
@@ -59,21 +83,13 @@ export class OptimizationRunner {
           const strategy = new StrategyClass(params);
           const portfolio = new Portfolio(10000); // Fixed 10k
           
-          const riskConfig: RiskConfig = {
-             riskPerTradePct: params['riskPerTrade'] || 0.01,
-             maxDrawdownPct: 0.1,
-             atrMultiplier: 2.0,
-             atrPeriod: 14,
-             trailingStop: true,
-             adxThreshold: 25,
-             dailyLossLimitPct: 0.02,
-             maxCorrelation: 0.7,
-             maxSectorExposurePct: 0.2,
-             volumeLimitPct: 0.1, // Liquidity Guard
-             useBollingerTakeProfit: true
+          // Apply params override to risk config if present (e.g. riskPerTrade)
+          const runRiskConfig: RiskConfig = {
+             ...riskConfig,
+             riskPerTradePct: params['riskPerTrade'] || riskConfig.riskPerTradePct
           };
           
-          const riskManager = new RiskManager(riskConfig);
+          const riskManager = new RiskManager(runRiskConfig);
           const backtester = new Backtester(strategy, portfolio, riskManager);
 
           const result = backtester.run(activeUniverse);
@@ -87,7 +103,7 @@ export class OptimizationRunner {
             result.metrics,
             startDate,
             endDate,
-            gitCommit
+            optimizationId
           );
 
           const runRecord: BacktestRun = {
@@ -97,7 +113,7 @@ export class OptimizationRunner {
             metrics: result.metrics,
             time_range_start: startDate,
             time_range_end: endDate,
-            git_commit: gitCommit,
+            optimization_id: optimizationId,
             created_at: new Date()
           };
 
@@ -113,7 +129,9 @@ export class OptimizationRunner {
         
         // Check if Optimizer supports Delegate Mode (e.g. Bayesian)
         if (optimizer.runDelegate) {
-           return await optimizer.runDelegate(runSingleTest);
+           const results = await optimizer.runDelegate(runSingleTest);
+           await this.backtestRepo.updateOptimizationStatus(optimizationId, 'COMPLETED');
+           return results;
         }
 
         // Default Iterative Mode (Grid/Random)
@@ -126,6 +144,12 @@ export class OptimizationRunner {
           optimizerHistory.push(runRecord);
         }
 
-    return history;
+        await this.backtestRepo.updateOptimizationStatus(optimizationId, 'COMPLETED');
+        return history;
+
+    } catch (err) {
+      await this.backtestRepo.updateOptimizationStatus(optimizationId, 'FAILED');
+      throw err;
+    }
   }
 }

@@ -16,6 +16,7 @@ export interface WindowProfile {
   endDate: Date;
   winningStrategy: string;
   winningScore: number;
+  optimizationId: string | null;
   regime: Regime;
   details: {
     [strategy: string]: number; // Scores based on chosen objective
@@ -24,13 +25,14 @@ export interface WindowProfile {
 
 export class RegimeProfiler {
   constructor(
-    private runner: OptimizationRunner
-  ) { }
+    private runner: OptimizationRunner,
+    private backtestRepo?: BacktestRepository
+  ) {}
 
   async profileAsset(
-    symbol: string,
-    startDate: Date,
-    endDate: Date,
+    symbol: string, 
+    startDate: Date, 
+    endDate: Date, 
     objective: keyof BacktestMetrics = 'sharpeRatio'
   ): Promise<RegimeProfile> {
     const years = this.generateYearlyWindows(startDate, endDate);
@@ -39,38 +41,63 @@ export class RegimeProfiler {
 
     for (const window of years) {
       console.log(`\n🔍 Profiling ${symbol} for ${window.year} (Objective: ${objective})...`);
-
+      
       // Run Optimizations
-      const trendScore = await this.optimizeTrend(symbol, window.start, window.end, objective);
-      const mrScore = await this.optimizeMeanReversion(symbol, window.start, window.end, objective);
-      const breakoutScore = await this.optimizeBreakout(symbol, window.start, window.end, objective);
-      const buyHoldScore = await this.runBuyAndHold(symbol, window.start, window.end, objective);
+      // We need to capture both the score AND the optimization ID
+      const trendRes = await this.optimizeTrend(symbol, window.start, window.end, objective);
+      const mrRes = await this.optimizeMeanReversion(symbol, window.start, window.end, objective);
+      const breakoutRes = await this.optimizeBreakout(symbol, window.start, window.end, objective);
+      const buyHoldRes = await this.runBuyAndHold(symbol, window.start, window.end, objective);
 
       const scores: Record<string, number> = {
-        'Trend': trendScore,
-        'MeanRev': mrScore,
-        'Breakout': breakoutScore,
-        'BuyHold': buyHoldScore
+        'Trend': trendRes.score,
+        'MeanRev': mrRes.score,
+        'Breakout': breakoutRes.score,
+        'BuyHold': buyHoldRes.score
       };
 
       // Delegate classification
       const result = classifier.classify(scores);
 
-      profiles.push({
+      // Identify the optimization ID of the winning strategy
+      let winningOptId: string | null = null;
+      if (result.winner === 'Trend Following') winningOptId = trendRes.optimizationId;
+      else if (result.winner === 'Mean Reversion') winningOptId = mrRes.optimizationId;
+      else if (result.winner === 'Volatility Breakout') winningOptId = breakoutRes.optimizationId;
+      else if (result.winner === 'Buy & Hold') winningOptId = buyHoldRes.optimizationId;
+
+      const profile: WindowProfile = {
         year: window.year,
         startDate: window.start,
         endDate: window.end,
         winningStrategy: result.winner,
         winningScore: result.winningScore,
+        optimizationId: winningOptId,
         regime: result.regime,
         details: scores
-      });
+      };
+
+      // Persist to DB if repo is available
+      if (this.backtestRepo) {
+        await this.backtestRepo.saveAssetProfile({
+          symbol,
+          year: window.year,
+          metric_used: objective,
+          regime: result.regime,
+          winning_strategy: result.winner,
+          winning_score: result.winningScore,
+          optimization_id: winningOptId,
+          details: scores
+        });
+      }
+
+      profiles.push(profile);
     }
 
     // Generate Summary
     const regimes = profiles.map(p => p.regime);
     const mode = this.mode(regimes);
-
+    
     return {
       symbol,
       profiles,
@@ -81,20 +108,20 @@ export class RegimeProfiler {
   private generateYearlyWindows(start: Date, end: Date) {
     const windows = [];
     let current = new Date(start);
-
+    
     while (current < end) {
       const year = current.getFullYear();
       const nextYear = new Date(current);
       nextYear.setFullYear(year + 1);
-
+      
       const windowEnd = nextYear > end ? end : nextYear;
-
+      
       windows.push({
         year,
         start: new Date(current),
         end: new Date(windowEnd)
       });
-
+      
       current = nextYear;
     }
     return windows;
@@ -102,7 +129,7 @@ export class RegimeProfiler {
 
   // --- Optimization Helpers ---
 
-  private async optimizeTrend(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<number> {
+  private async optimizeTrend(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null}> {
     const config: OptimizationConfig = {
       strategyName: 'EmaAdxStrategy',
       assets: [symbol],
@@ -117,10 +144,10 @@ export class RegimeProfiler {
         adxThreshold: { min: 20, max: 30, type: 'integer' }
       }
     };
-    return this.getBestScore(config);
+    return this.getBestResult(config);
   }
 
-  private async optimizeMeanReversion(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<number> {
+  private async optimizeMeanReversion(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null}> {
     const config: OptimizationConfig = {
       strategyName: 'BollingerMeanReversionStrategy',
       assets: [symbol],
@@ -134,10 +161,10 @@ export class RegimeProfiler {
         mfiBuyThreshold: { min: 10, max: 30, type: 'integer' }
       }
     };
-    return this.getBestScore(config);
+    return this.getBestResult(config);
   }
 
-  private async optimizeBreakout(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<number> {
+  private async optimizeBreakout(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null}> {
     const config: OptimizationConfig = {
       strategyName: 'VolatilityBreakoutStrategy',
       assets: [symbol],
@@ -151,10 +178,10 @@ export class RegimeProfiler {
         volumeMultiplier: { min: 1.2, max: 2.5, type: 'float' }
       }
     };
-    return this.getBestScore(config);
+    return this.getBestResult(config);
   }
 
-  private async runBuyAndHold(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<number> {
+  private async runBuyAndHold(symbol: string, start: Date, end: Date, objective: keyof BacktestMetrics): Promise<{score: number, optimizationId: string | null}> {
     // Single iteration
     const config: OptimizationConfig = {
       strategyName: 'BuyAndHoldStrategy',
@@ -166,46 +193,52 @@ export class RegimeProfiler {
       maxIterations: 1,
       parameters: {}
     };
-    return this.getBestScore(config);
+    return this.getBestResult(config);
   }
 
-  private async getBestScore(config: OptimizationConfig): Promise<number> {
+  private async getBestResult(config: OptimizationConfig): Promise<{score: number, optimizationId: string | null}> {
     try {
-      // Run with logging disabled to avoid spamming stdout
-      const runs = await this.runner.run(config, 'profiler', false);
-      if (runs.length === 0) return -1;
+        // Run with logging disabled to avoid spamming stdout
+        const runs = await this.runner.run(config, 'profiler', false);
+        if (runs.length === 0) return { score: -999, optimizationId: null };
+        
+        let maxScore = -999;
+        const objective = config.objective;
+        
+        // All runs from the same session share the optimization_id
+        const optId = runs[0].optimization_id; 
 
-      let maxScore = -999;
-      const objective = config.objective;
-      for (const run of runs) {
-        const score = (run.metrics as any)[objective] || 0;
-        if (score > maxScore) {
-          maxScore = score;
+        for (const run of runs) {
+            const score = (run.metrics as any)[objective] || 0;
+            if (score > maxScore) {
+                maxScore = score;
+            }
         }
-      }
-      return maxScore;
+        return { score: maxScore, optimizationId: optId };
     } catch (error) {
-      // e.g. No data
-      console.warn(`Optimization failed for ${config.strategyName}: ${error}`);
-      return -999;
+        // e.g. No data
+        console.warn(`Optimization failed for ${config.strategyName}: ${error}`);
+        return { score: -999, optimizationId: null };
     }
   }
-
+  
   private mode(array: string[]): string {
-    if (array.length === 0) return 'Unknown';
-    const modeMap: any = {};
-    let maxEl = array[0], maxCount = 1;
-    for (let i = 0; i < array.length; i++) {
-      let el = array[i];
-      if (modeMap[el] == null)
-        modeMap[el] = 1;
-      else
-        modeMap[el]++;
-      if (modeMap[el] > maxCount) {
-        maxEl = el;
-        maxCount = modeMap[el];
+      if (array.length === 0) return 'Unknown';
+      const modeMap: any = {};
+      let maxEl = array[0], maxCount = 1;
+      for (let i = 0; i < array.length; i++) {
+          let el = array[i];
+          if(modeMap[el] == null)
+              modeMap[el] = 1;
+          else
+              modeMap[el]++;  
+          if(modeMap[el] > maxCount)
+          {
+              maxEl = el;
+              maxCount = modeMap[el];
+          }
       }
-    }
-    return maxEl;
+      return maxEl;
   }
 }
+

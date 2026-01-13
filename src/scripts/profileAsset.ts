@@ -50,7 +50,7 @@ async function main() {
 
   // 2. Setup Runner
   const runner = new OptimizationRunner(backtestRepo, universe);
-  const profiler = new RegimeProfiler(runner);
+  const profiler = new RegimeProfiler(runner, backtestRepo);
 
   // 3. Run Profiler
   const report = await profiler.profileAsset(symbol, startDate, endDate, objective);

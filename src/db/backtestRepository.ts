@@ -1,5 +1,6 @@
 import pool from './index';
-import { BacktestMetrics } from '../logic/types';
+import { BacktestMetrics, RiskConfig } from '../logic/types';
+import { OptimizationConfig } from '../logic/optimizer/types';
 
 export interface BacktestRun {
   id: string;
@@ -8,11 +9,68 @@ export interface BacktestRun {
   metrics: BacktestMetrics;
   time_range_start: Date;
   time_range_end: Date;
-  git_commit: string | null;
+  optimization_id: string | null;
   created_at: Date;
 }
 
+export interface OptimizationRecord {
+  id: string;
+  strategy_name: string;
+  config: OptimizationConfig;
+  risk_config: RiskConfig;
+  git_commit: string | null;
+  status: string;
+  created_at: Date;
+}
+
+export interface AssetProfileRecord {
+  symbol: string;
+  year: number;
+  metric_used: string;
+  regime: string;
+  winning_strategy: string;
+  winning_score: number;
+  optimization_id: string | null;
+  details: Record<string, number>;
+}
+
 export class BacktestRepository {
+  /**
+   * Creates a parent optimization record.
+   */
+  async createOptimization(
+    strategyName: string,
+    config: OptimizationConfig,
+    riskConfig: RiskConfig,
+    gitCommit: string
+  ): Promise<string> {
+    const queryText = `
+      INSERT INTO optimizations (
+        strategy_name,
+        config,
+        risk_config,
+        git_commit,
+        status
+      )
+      VALUES ($1, $2, $3, $4, 'RUNNING')
+      RETURNING id
+    `;
+    const result = await pool.query(queryText, [
+      strategyName,
+      config,
+      riskConfig,
+      gitCommit
+    ]);
+    return result.rows[0].id;
+  }
+
+  /**
+   * Updates the status of an optimization.
+   */
+  async updateOptimizationStatus(id: string, status: 'COMPLETED' | 'FAILED') {
+    await pool.query('UPDATE optimizations SET status = $1 WHERE id = $2', [status, id]);
+  }
+
   /**
    * Saves a new backtest run to the database.
    */
@@ -22,7 +80,7 @@ export class BacktestRepository {
     metrics: BacktestMetrics,
     startDate: Date,
     endDate: Date,
-    gitCommit?: string
+    optimizationId?: string
   ): Promise<string> {
     const queryText = `
       INSERT INTO backtest_runs (
@@ -31,27 +89,54 @@ export class BacktestRepository {
         metrics, 
         time_range_start, 
         time_range_end, 
-        git_commit
+        optimization_id
       )
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
     `;
 
-    // pg driver handles JSON serialization for objects passed to JSONB columns?
-    // Usually it's safer to pass objects directly if we trust the driver, 
-    // but explicit JSON.stringify ensures we send a string that PG casts to JSONB.
-    // However, node-postgres usually converts objects to JSON automatically for binding.
-    // Let's rely on node-postgres default object serialization.
-    
     const result = await pool.query(queryText, [
       strategyName,
-      parameters, // node-postgres should handle object -> json
+      parameters, 
       metrics,
       startDate,
       endDate,
-      gitCommit || null
+      optimizationId || null
     ]);
 
+    return result.rows[0].id;
+  }
+
+  /**
+   * Saves an asset profile result.
+   */
+  async saveAssetProfile(profile: AssetProfileRecord): Promise<string> {
+    const queryText = `
+      INSERT INTO asset_profiles (
+        symbol,
+        year,
+        metric_used,
+        regime,
+        winning_strategy,
+        winning_score,
+        optimization_id,
+        details
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
+    `;
+    
+    const result = await pool.query(queryText, [
+      profile.symbol,
+      profile.year,
+      profile.metric_used,
+      profile.regime,
+      profile.winning_strategy,
+      profile.winning_score,
+      profile.optimization_id || null,
+      profile.details
+    ]);
+    
     return result.rows[0].id;
   }
 
@@ -69,7 +154,6 @@ export class BacktestRepository {
     
     return result.rows.map(row => ({
       ...row,
-      // pg parses JSONB columns to objects automatically
     }));
   }
 
