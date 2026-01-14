@@ -11,7 +11,7 @@ export class OptimizationRunner {
   constructor(
     private backtestRepo: BacktestRepository,
     private universe: Map<string, Candle[]> // Fully typed history to return
-  ) {}
+  ) { }
 
   /**
    * Runs a full optimization session based on the config.
@@ -53,99 +53,99 @@ export class OptimizationRunner {
     );
 
     try {
-        // Filter universe to match config assets AND time range
-        const activeUniverse = new Map<string, Candle[]>();
-        const start = new Date(config.startDate);
-        const end = new Date(config.endDate);
-    
-        for (const asset of config.assets) {
-          if (this.universe.has(asset)) {
-            const fullCandles = this.universe.get(asset)!;
-            const slicedCandles = fullCandles.filter(c => c.time >= start && c.time < end);
-            
-            if (slicedCandles.length > 0) {
-              activeUniverse.set(asset, slicedCandles);
-            }
+      // Filter universe to match config assets AND time range
+      const activeUniverse = new Map<string, Candle[]>();
+      const start = new Date(config.startDate);
+      const end = new Date(config.endDate);
+
+      for (const asset of config.assets) {
+        if (this.universe.has(asset)) {
+          const fullCandles = this.universe.get(asset)!;
+          const slicedCandles = fullCandles.filter(c => c.time >= start && c.time < end);
+
+          if (slicedCandles.length > 0) {
+            activeUniverse.set(asset, slicedCandles);
           }
         }
-    
-        if (activeUniverse.size === 0) {
-          throw new Error(`No data found for [${config.startDate} -> ${config.endDate}]`);
+      }
+
+      if (activeUniverse.size === 0) {
+        throw new Error(`No data found for [${config.startDate} -> ${config.endDate}]`);
+      }
+
+      // Define the "Single Test" logic as a reusable function
+      const runSingleTest = async (params: ParameterSet): Promise<BacktestRun> => {
+        iteration++;
+        if (logProgress) {
+          process.stdout.write(`\r🔄 Iteration ${iteration}: Testing ${JSON.stringify(params)}...`);
         }
-    
-        // Define the "Single Test" logic as a reusable function
-        const runSingleTest = async (params: ParameterSet): Promise<BacktestRun> => {
-          iteration++;
-          if (logProgress) {
-            process.stdout.write(`\r🔄 Iteration ${iteration}: Testing ${JSON.stringify(params)}...`);
-          }
 
-          const strategy = new StrategyClass(params);
-          const portfolio = new Portfolio(10000); // Fixed 10k
-          
-          // Apply params override to risk config if present (e.g. riskPerTrade)
-          const runRiskConfig: RiskConfig = {
-             ...riskConfig,
-             riskPerTradePct: params['riskPerTrade'] || riskConfig.riskPerTradePct
-          };
-          
-          const riskManager = new RiskManager(runRiskConfig);
-          const backtester = new Backtester(strategy, portfolio, riskManager);
+        const strategy = new StrategyClass(params);
+        const portfolio = new Portfolio(10000); // Fixed 10k
 
-          const result = backtester.run(activeUniverse);
-
-          const startDate = new Date(config.startDate);
-          const endDate = new Date(config.endDate);
-
-          const runId = await this.backtestRepo.saveRun(
-            config.strategyName,
-            params,
-            result.metrics,
-            startDate,
-            endDate,
-            optimizationId
-          );
-
-          const runRecord: BacktestRun = {
-            id: runId,
-            strategy_name: config.strategyName,
-            parameters: params,
-            metrics: result.metrics,
-            time_range_start: startDate,
-            time_range_end: endDate,
-            optimization_id: optimizationId,
-            created_at: new Date()
-          };
-
-          if (logProgress) {
-            const objectiveValue = (result.metrics as any)[config.objective];
-            process.stdout.write(` Done. ${config.objective}: ${objectiveValue?.toFixed(3)}\n`);
-          }
-
-          return runRecord;
+        // Apply params override to risk config if present (e.g. riskPerTrade)
+        const runRiskConfig: RiskConfig = {
+          ...riskConfig,
+          riskPerTradePct: params['riskPerTrade'] || riskConfig.riskPerTradePct
         };
 
-        // --- Execution Logic ---
-        
-        // Check if Optimizer supports Delegate Mode (e.g. Bayesian)
-        if (optimizer.runDelegate) {
-           const results = await optimizer.runDelegate(runSingleTest);
-           await this.backtestRepo.updateOptimizationStatus(optimizationId, 'COMPLETED');
-           return results;
+        const riskManager = new RiskManager(runRiskConfig);
+        const backtester = new Backtester(strategy, portfolio, riskManager);
+
+        const result = backtester.run(activeUniverse);
+
+        const startDate = new Date(config.startDate);
+        const endDate = new Date(config.endDate);
+
+        const runId = await this.backtestRepo.saveRun(
+          config.strategyName,
+          params,
+          result.metrics,
+          startDate,
+          endDate,
+          optimizationId
+        );
+
+        const runRecord: BacktestRun = {
+          id: runId,
+          strategy_name: config.strategyName,
+          parameters: params,
+          metrics: result.metrics,
+          time_range_start: startDate,
+          time_range_end: endDate,
+          optimization_id: optimizationId,
+          created_at: new Date()
+        };
+
+        if (logProgress) {
+          const objectiveValue = (result.metrics as any)[config.objective];
+          process.stdout.write(` Done. ${config.objective}: ${objectiveValue?.toFixed(3)}\n`);
         }
 
-        // Default Iterative Mode (Grid/Random)
-        while (true) {
-          const params = optimizer.getNextParams(optimizerHistory);
-          if (!params) break;
+        return runRecord;
+      };
 
-          const runRecord = await runSingleTest(params);
-          history.push(runRecord);
-          optimizerHistory.push(runRecord);
-        }
+      // --- Execution Logic ---
 
+      // Check if Optimizer supports Delegate Mode (e.g. Bayesian)
+      if (optimizer.runDelegate) {
+        const results = await optimizer.runDelegate(runSingleTest);
         await this.backtestRepo.updateOptimizationStatus(optimizationId, 'COMPLETED');
-        return history;
+        return results;
+      }
+
+      // Default Iterative Mode (Grid/Random)
+      while (true) {
+        const params = optimizer.getNextParams(optimizerHistory);
+        if (!params) break;
+
+        const runRecord = await runSingleTest(params);
+        history.push(runRecord);
+        optimizerHistory.push(runRecord);
+      }
+
+      await this.backtestRepo.updateOptimizationStatus(optimizationId, 'COMPLETED');
+      return history;
 
     } catch (err) {
       await this.backtestRepo.updateOptimizationStatus(optimizationId, 'FAILED');
