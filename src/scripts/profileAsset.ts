@@ -50,7 +50,7 @@ async function main() {
 
   // 2. Setup Runner
   const runner = new OptimizationRunner(backtestRepo, universe);
-  const profiler = new RegimeProfiler(runner, backtestRepo);
+  const profiler = new RegimeProfiler(runner, universe, backtestRepo);
 
   // 3. Run Profiler
   const report = await profiler.profileAsset(symbol, startDate, endDate, objective);
@@ -66,6 +66,9 @@ async function main() {
     Regime: p.regime,
     'Winner': p.winningStrategy,
     'Score': p.winningScore.toFixed(2),
+    'Hurst': p.physics.hurst.toFixed(2),
+    'KER': p.physics.ker.toFixed(2),
+    'Kurt': p.physics.kurtosis.toFixed(2),
     'Trend': p.details['Trend'].toFixed(2),
     'MeanRev': p.details['MeanRev'].toFixed(2),
     'Breakout': p.details['Breakout'].toFixed(2),

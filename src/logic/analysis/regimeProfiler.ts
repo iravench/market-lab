@@ -3,6 +3,7 @@ import { OptimizationConfig } from '../optimizer/types';
 import { BacktestRepository } from '../../db/backtestRepository';
 import { Candle, BacktestMetrics } from '../types';
 import { ClassifierFactory, Regime } from './regimeClassifier';
+import { calculateHurstExponent, calculateKER, calculateKurtosis, calculateReturns } from '../math';
 
 export interface RegimeProfile {
   symbol: string;
@@ -18,6 +19,11 @@ export interface WindowProfile {
   winningScore: number;
   optimizationId: string | null;
   regime: Regime;
+  physics: {
+    hurst: number;
+    ker: number;
+    kurtosis: number;
+  };
   details: {
     [strategy: string]: number; // Scores based on chosen objective
   };
@@ -27,6 +33,7 @@ export interface WindowProfile {
 export class RegimeProfiler {
   constructor(
     private runner: OptimizationRunner,
+    private universe: Map<string, Candle[]>,
     private backtestRepo?: BacktestRepository
   ) {}
 
@@ -40,10 +47,24 @@ export class RegimeProfiler {
     const profiles: WindowProfile[] = [];
     const classifier = ClassifierFactory.get(objective);
 
+    // Get all candles for this symbol once
+    const allCandles = this.universe.get(symbol) || [];
+
     for (const window of years) {
       console.log(`\n🔍 Profiling ${symbol} for ${window.year} (Objective: ${objective})...`);
       
-      // Run Optimizations
+      // 1. Calculate Physics (Phase 9)
+      const windowCandles = allCandles.filter(c => c.time >= window.start && c.time < window.end);
+      const closePrices = windowCandles.map(c => c.close);
+      const returns = calculateReturns(closePrices);
+
+      const hurst = calculateHurstExponent(closePrices);
+      const ker = calculateKER(closePrices);
+      const kurtosis = calculateKurtosis(returns);
+
+      console.log(`   ⚛️ Physics: Hurst=${hurst.toFixed(2)}, KER=${ker.toFixed(2)}, Kurtosis=${kurtosis.toFixed(2)}`);
+
+      // 2. Run Optimizations
       const trendRes = await this.optimizeTrend(symbol, window.start, window.end, objective);
       const mrRes = await this.optimizeMeanReversion(symbol, window.start, window.end, objective);
       const breakoutRes = await this.optimizeBreakout(symbol, window.start, window.end, objective);
@@ -75,6 +96,8 @@ export class RegimeProfiler {
 
       const meta = { optimizations };
 
+      const physics = { hurst, ker, kurtosis };
+
       const profile: WindowProfile = {
         year: window.year,
         startDate: window.start,
@@ -83,6 +106,7 @@ export class RegimeProfiler {
         winningScore: result.winningScore,
         optimizationId: winningOptId,
         regime: result.regime,
+        physics,
         details: scores,
         meta
       };
@@ -98,7 +122,7 @@ export class RegimeProfiler {
           winning_score: result.winningScore,
           optimization_id: winningOptId,
           details: scores,
-          meta
+          meta: { ...meta, physics } // Store physics in meta for now until DB schema update
         });
       }
 
