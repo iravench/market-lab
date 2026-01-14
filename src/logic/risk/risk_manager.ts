@@ -234,4 +234,36 @@ export class RiskManager {
     const exposure = sectorValue / totalEquity;
     return exposure > this.config.maxSectorExposurePct;
   }
+
+  /**
+   * Regime Guard: Checks if a strategy is compatible with the detected market regime.
+   * 
+   * @param strategyName Name of the strategy (e.g., 'RsiStrategy')
+   * @param regime Detected regime (e.g., 'CHOPPY', 'TRENDING')
+   * @returns { compatible: boolean, reason?: string }
+   */
+  public checkRegimeCompatibility(strategyName: string, regime: string): { compatible: boolean; reason?: string } {
+    if (regime === 'CHOPPY') {
+      return { compatible: false, reason: `Market is CHOPPY. No strategies allowed.` };
+    }
+
+    const mapping: Record<string, string[]> = {
+      'TRENDING': ['EmaAdxStrategy', 'VolatilityBreakoutStrategy'],
+      'MEAN_REVERSION': ['RsiStrategy', 'BollingerMeanReversionStrategy'],
+      'VOLATILE_BREAKOUT': ['VolatilityBreakoutStrategy'],
+      'BULL_MARKET': ['BuyAndHoldStrategy', 'EmaAdxStrategy', 'VolatilityBreakoutStrategy']
+    };
+
+    const allowedStrategies = mapping[regime] || [];
+    const isCompatible = allowedStrategies.includes(strategyName);
+
+    if (!isCompatible) {
+      return { 
+        compatible: false, 
+        reason: `Strategy '${strategyName}' is not compatible with detected '${regime}' regime.` 
+      };
+    }
+
+    return { compatible: true };
+  }
 }

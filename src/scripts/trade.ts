@@ -8,6 +8,7 @@ import { calculateATR } from '../logic/indicators/atr';
 import { FixedPercentageSlippage } from '../logic/slippage';
 import { MarketDataProvider } from '../services/marketDataProvider';
 import { ASSET_METADATA_MAP } from '../config/assets';
+import { BacktestRepository } from '../db/backtestRepository';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -34,9 +35,10 @@ async function main() {
   console.log(`📂 Portfolio: ${portfolioId}`);
   console.log(`⚠️  Mode: ${mode.toUpperCase()}`);
 
-  // Execution Configuration
+  // Components
   const slippageModel = new FixedPercentageSlippage(0.001); // 0.1% slippage
   const marketDataProvider = new MarketDataProvider();
+  const backtestRepo = new BacktestRepository();
 
   // Risk Configuration
   const riskConfig: RiskConfig = {
@@ -86,7 +88,23 @@ async function main() {
     const latestCandle = candles[candles.length - 1];
     console.log(`📊 Analyzed ${candles.length} candles. Latest: $${latestCandle.close.toFixed(2)}`);
 
-    // 2. Load Portfolio
+    // 2. Regime Guard (Asset Intelligence)
+    const currentYear = new Date().getFullYear();
+    const profile = await backtestRepo.getLatestProfile(symbol, currentYear);
+    
+    if (profile) {
+      console.log(`🛡️  Regime Check: ${symbol} is profiled as '${profile.regime}' for ${currentYear}.`);
+      const compatibility = riskManager.checkRegimeCompatibility(strategyName, profile.regime);
+      if (!compatibility.compatible) {
+        console.error(`⛔ TRADE BLOCKED: ${compatibility.reason}`);
+        process.exit(0); // Exit gracefully as this is an intended safety block
+      }
+      console.log(`✅ Regime Compatible: Strategy ${strategyName} is allowed.`);
+    } else {
+      console.warn(`⚠️  No Asset Profile found for ${symbol} in ${currentYear}. Proceeding with Caution...`);
+    }
+
+    // 3. Load Portfolio
     const portfolio = new PersistentPortfolio(portfolioId, 0, { fixed: 10 });
     await portfolio.load();
 

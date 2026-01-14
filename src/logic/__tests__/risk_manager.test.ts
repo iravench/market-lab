@@ -305,4 +305,31 @@ describe('RiskManager', () => {
     const fewCandles = candles.slice(0, 19);
     expect(riskManager.calculateBollingerTakeProfit(fewCandles, 'BUY')).toBeNull();
   });
+
+  it('should check regime compatibility (Regime Guard)', () => {
+    // 1. Choppy Regime: No strategies allowed
+    expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'CHOPPY').compatible).toBe(false);
+    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'CHOPPY').compatible).toBe(false);
+
+    // 2. Trending Regime: Only Trend Strategies
+    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'TRENDING').compatible).toBe(true);
+    expect(riskManager.checkRegimeCompatibility('VolatilityBreakoutStrategy', 'TRENDING').compatible).toBe(true);
+    
+    // Mismatch
+    expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'TRENDING').compatible).toBe(false);
+
+    // 3. Mean Reversion Regime: Only MR Strategies
+    expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'MEAN_REVERSION').compatible).toBe(true);
+    expect(riskManager.checkRegimeCompatibility('BollingerMeanReversionStrategy', 'MEAN_REVERSION').compatible).toBe(true);
+    
+    // Mismatch
+    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'MEAN_REVERSION').compatible).toBe(false);
+
+    // 4. Bull Market: Beta (BuyAndHold) and Trend allowed
+    expect(riskManager.checkRegimeCompatibility('BuyAndHoldStrategy', 'BULL_MARKET').compatible).toBe(true);
+    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'BULL_MARKET').compatible).toBe(true);
+    
+    // Rsi might underperform in strong bull run (overbought trap)
+    expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'BULL_MARKET').compatible).toBe(false);
+  });
 });

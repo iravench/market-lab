@@ -144,131 +144,190 @@ The system follows a strict separation of concerns:
 
 ### Usage
 
-* **Backfill Data:**
+#### 1. Data Management
 
-    ```bash
-    npm run backfill <SYMBOL> <START_DATE> <INTERVAL>
-    # Example: npm run backfill CBA.AX 2024-01-01 1d
-    ```
-
-* **Verify Data:**
-
-    ```bash
-    npm run verify <SYMBOL>
-    ```
-
-* **Run Tests:**
-
-    ```bash
-    npm test
-    ```
-
-* **Run Backtest:**
-
-    ```bash
-    npm run backtest <SYMBOLS_CSV> <START> <END> [STRATEGY_NAME]
-    # Example: npm run backtest "CBA.AX,NAB.AX" 2023-01-01 2024-01-01 "RsiStrategy"
-    ```
-
-    **Available Strategies:**
-    *   `RsiStrategy` (Default)
-    *   `EmaAdxStrategy`
-    *   `VolatilityBreakoutStrategy`
-    *   `BollingerMeanReversionStrategy`
-    *   `BuyAndHoldStrategy`
-
-    **Example Output:**
+**`npm run backfill`**
+*   **Purpose:** Download historical OHLCV data from Yahoo Finance to the local TimescaleDB.
+*   **Command:** `npm run backfill <SYMBOL> <START_DATE> <INTERVAL>`
+*   **Example:** `npm run backfill CBA.AX 2023-01-01 1d`
+*   **Output:**
     ```text
-    =======================================
-    🏁 Backtest Complete: RSI Reversal
-    =======================================
-    Initial Capital:     $10000.00
-    Final Capital:       $10131.82
-    Total Return:        1.32%
-    Max Drawdown:        3.63%
-    Max Sector Exposure: 21.61%
-    Sharpe Ratio:        0.287
-    Win Rate:            57.14%
-    Total Trades:        17
+    📥 Fetching 1d candles for CBA.AX starting from 2023-01-01...
+    💾 Saving 768 candles to database...
+    ✅ Successfully backfilled CBA.AX.
+    ```
 
-    📊 Final Portfolio: 100% Cash
+**`npm run verify`**
+*   **Purpose:** Check data integrity (gaps, missing candles) for a symbol.
+*   **Command:** `npm run verify <SYMBOL>`
+*   **Example:** `npm run verify CBA.AX`
+*   **Output:**
+    ```text
+    📊 Data Stats for CBA.AX:
+    ┌─────────┬──────────┬───────────────┬──────────────────────────┬──────────────────────────┐
+    │ (index) │ interval │ total_candles │ first_candle             │ last_candle              │
+    ├─────────┼──────────┼───────────────┼──────────────────────────┼──────────────────────────┤
+    │ 0       │ '1d'     │ '1531'        │ 2020-01-01T23:00:00.000Z │ 2026-01-14T05:10:25.000Z │
+    └─────────┴──────────┴───────────────┴──────────────────────────┴──────────────────────────┘
+
+    📅 Latest 5 candles:
+    ┌─────────┬──────────────────────────┬──────────────────────┬──────────────────────┬──────────────────────┐
+    │ (index) │ time                     │ open                 │ close                │ volume               │
+    ├─────────┼──────────────────────────┼──────────────────────┼──────────────────────┼──────────────────────┤
+    │ 0       │ 2026-01-14T05:10:25.000Z │ '154.20'             │ '152.88'             │ '1888875'            │
+    │ 1       │ 2026-01-12T23:00:00.000Z │ '155.00'             │ '154.82'             │ '1324215'            │
+    └─────────┴──────────────────────────┴──────────────────────┴──────────────────────┴──────────────────────┘
+    ```
+
+---
+
+#### 2. Strategy Development (The Lab)
+
+**`npm run backtest`**
+*   **Purpose:** **Raw Simulation.** Tests strategy logic against history *without* external safety guards. It validates "Does the math work?" not "Should I trade this today?"
+*   **Command:** `npm run backtest <SYMBOLS_CSV> <START> <END> [STRATEGY_NAME]`
+*   **Example:** `npm run backtest "CBA.AX" 2023-01-01 2026-01-01 "RsiStrategy"`
+*   **Key Outputs:**
+    *   `Sharpe Ratio`: Risk-adjusted return (>1.0 is good).
+    *   `Max Drawdown`: Maximum peak-to-trough loss.
+*   **Result (CBA.AX):**
+    ```text
+    🏁 Backtest Complete: RSI Reversal
+    Initial Capital:     10000.00
+    Final Capital:       10107.28
+    Total Return:        1.07%
+    Max Drawdown:        1.00%
+    Max Sector Exposure: 17.00%
+    Sharpe Ratio:        0.502
+    Win Rate:            100.00%
+    Total Trades:        3
+
+    📊 Final Portfolio Breakdown:
+      Financials          : 15.89% ($1605.70)
+      Cash                : 84.11% ($8501.58)
 
     📜 Trade History (Last 3 per symbol):
-      --- CBA.AX (Total Trades: 4) ---
-      [2025-11-18] BUY 10 @ $151.45
-      [2026-01-05] SELL 10 @ $156.63
+      --- CBA.AX (Total Trades: 3) ---
+      [2025-03-11] BUY 11 @ $144.94 (Fee: $10.00)
+      [2025-04-07] SELL 11 @ $149.13 (Fee: $10.00)
+      [2025-11-18] BUY 10 @ $151.45 (Fee: $10.00)
     ```
 
-    **Key Metrics:**
-    *   **Max Sector Exposure:** The highest percentage of your portfolio concentrated in a single sector (e.g., Banking) at any point. Used to verify diversification.
-    *   **Max Drawdown:** The largest peak-to-trough decline in portfolio value. Measures risk.
-    *   **Sharpe Ratio:** Risk-adjusted return. > 1.0 is good, > 2.0 is excellent.
-
-* **Run Optimization:**
-
-    ```bash
-    # Create a config file (e.g., config.json)
-    npm run optimize config.json
-    ```
-
-    **Recommended Search Method:** Use `"searchMethod": "bayesian"` (TPE). It is significantly more efficient than Grid Search, finding optimal parameters in 10-20% of the iterations.
-
-    **Available Strategies:** `RsiStrategy`, `EmaAdxStrategy`
-
-    **Example `config.json`:**
+**`npm run optimize`**
+*   **Purpose:** Find the best parameters (e.g., RSI Period) for a strategy using Bayesian Optimization (TPE).
+*   **Command:** `npm run optimize <CONFIG_FILE>`
+*   **Example Config (`optimize_config.json`):**
     ```json
     {
       "strategyName": "RsiStrategy",
       "assets": ["CBA.AX"],
-      "startDate": "2023-01-01",
-      "endDate": "2024-01-01",
+      "startDate": "2024-01-01",
+      "endDate": "2025-01-01",
       "objective": "sharpeRatio",
       "searchMethod": "bayesian",
-      "maxIterations": 50,
+      "maxIterations": 5,
       "parameters": {
         "period": { "min": 5, "max": 30, "type": "integer" },
         "buyThreshold": { "min": 20, "max": 40, "type": "integer" }
       }
     }
     ```
-
-* **Run Walk-Forward Analysis:**
-
-    ```bash
-    npm run walk-forward wf_config.json
+*   **Output:**
+    ```text
+    🚀 Starting Optimization: RsiStrategy
+    🎯 Objective: sharpeRatio
+    🔎 Method: bayesian
+    ⏳ Loading Market Data...
+    🔄 Iteration 1: Testing {"period":25,"buyThreshold":28}... Done. sharpeRatio: 0.000
+    ...
+    ✅ Optimization Session Complete.
     ```
 
-    **Example `wf_config.json`:**
+**`npm run walk-forward`**
+*   **Purpose:** Validate if optimized parameters hold up in "Out of Sample" future data.
+*   **Command:** `npm run walk-forward <WF_CONFIG_FILE>`
+*   **Example Config (`wf_config.json`):**
     ```json
     {
       "strategyName": "RsiStrategy",
       "assets": ["CBA.AX"],
       "startDate": "2023-01-01",
-      "endDate": "2026-01-01",
-      "trainWindowDays": 180,
-      "testWindowDays": 90,
+      "endDate": "2025-01-01",
+      "trainWindowDays": 365,
+      "testWindowDays": 180,
       "anchored": false,
       "objective": "sharpeRatio",
       "searchMethod": "bayesian",
-      "maxIterations": 30,
+      "maxIterations": 5,
       "parameters": {
         "period": { "min": 10, "max": 20, "type": "integer" },
         "buyThreshold": { "min": 25, "max": 35, "type": "integer" }
       }
     }
     ```
+*   **Output:**
+    ```text
+    🚀 Starting Walk-Forward Analysis: RsiStrategy
+    📅 Total Range: 2023-01-01 to 2025-01-01
+    📏 Windows: Train=365d, Test=180d, Anchored=false
+    ⏳ Loading Market Data...
+    ✅ Generated 3 Walk-Forward Windows.
 
-* **Paper Trading (Bot):**
-
-    ```bash
-    # 1. Create a Portfolio
-    npm run create-portfolio "My Bot" 10000
-
-    # 2. Run a Dry Run (No DB updates)
-    npm run trade <PORTFOLIO_ID> <SYMBOL> DRY [STRATEGY_NAME]
-    
-    # 3. Run Live (Updates DB)
-    npm run trade <PORTFOLIO_ID> <SYMBOL> LIVE [STRATEGY_NAME]
+    🔹 Window 1: Train [2023-01-01 -> 2024-01-01] | Test [2024-01-01 -> 2024-06-29]
+       🏆 Best Train Params: {"period":11,"buyThreshold":32} (sharpeRatio: 0.000)
+    ...
+    🏁 Walk-Forward Complete.
     ```
-    
-    *Note: Defaults to `RsiStrategy` if `STRATEGY_NAME` is omitted.*
+
+---
+
+#### 3. Asset Intelligence (The Analyst)
+
+**`npm run profile-asset`**
+*   **Purpose:** Determine an asset's "Personality" (Regime) by testing it against the Canonical Strategy Suite.
+*   **Command:** `npm run profile-asset <SYMBOL> <START> <END>`
+*   **Example:** `npm run profile-asset CBA.AX 2024-01-01 2026-02-01`
+*   **Output:**
+    ```text
+    ==========================================
+    🧠 ASSET IDENTITY: CBA.AX
+    📝 Conclusion: Asset CBA.AX is predominantly CHOPPY.
+    ==========================================
+    ┌─────────┬──────┬──────────┬────────┬───────────┬────────┬─────────┬──────────┬─────────┐
+    │ (index) │ Year │ Regime   │ Winner │ Score     │ Trend  │ MeanRev │ Breakout │ BuyHold │
+    ├─────────┼──────┼──────────┼────────┼───────────┼────────┼─────────┼──────────┼─────────┤
+    │ 0       │ 2024 │ 'CHOPPY' │ 'None' │ '-999.00' │ '0.00' │ '0.00'  │ '0.00'   │ '1.67'  │
+    │ 1       │ 2025 │ 'CHOPPY' │ 'None' │ '-999.00' │ '0.00' │ '0.00'  │ '0.00'   │ '-0.74' │
+    │ 2       │ 2026 │ 'CHOPPY' │ 'None' │ '-999.00' │ '0.00' │ '0.00'  │ '0.00'   │ '-7.37' │
+    └─────────┴──────┴──────────┴────────┴───────────┴────────┴─────────┴──────────┴─────────┘
+    ```
+*   **Significance:** Tells the Execution Engine *which* strategies are safe to run.
+
+---
+
+#### 4. Execution (The Trader)
+
+**`npm run create-portfolio`**
+*   **Purpose:** Initialize a new persistent portfolio ledger.
+*   **Command:** `npm run create-portfolio <NAME> <INITIAL_CASH>`
+*   **Example:** `npm run create-portfolio "Demo_Bot" 10000`
+
+**`npm run trade`**
+*   **Purpose:** **Guarded Execution.** Runs the strategy on Live/Paper data with **Regime Guards** active.
+*   **Philosophy:** Unlike Backtesting, this tool **rejects** signals if the environment is unsuitable.
+*   **Command:** `npm run trade <PORTFOLIO_ID> <SYMBOL> <MODE> [STRATEGY_NAME]`
+*   **Example:** `npm run trade "pf_123" CBA.AX DRY "RsiStrategy"`
+*   **Output (Regime Guard in action):**
+    ```text
+    🤖 Starting Bot for CBA.AX
+    🧠 Strategy: RsiStrategy
+    📥 Fetching latest market data...
+    🛡️  Regime Check: CBA.AX is profiled as 'CHOPPY' for 2026.
+    ⛔ TRADE BLOCKED: Market is CHOPPY. No strategies allowed.
+    ```
+*   **Safety Guards:**
+    *   **Regime Guard:** Blocks trades in wrong environments based on `Asset Profiles`.
+    *   **Liquidity Guard:** Partial fills based on volume participation limits.
+    *   **Daily Loss Limit:** Halts trading if today's loss > 2%.
+    *   **Correlation Filter:** Rejects trades highly correlated with existing holdings.
+

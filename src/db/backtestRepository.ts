@@ -144,6 +144,26 @@ export class BacktestRepository {
   }
 
   /**
+   * Retrieves the latest profile for a symbol and year.
+   */
+  async getLatestProfile(
+    symbol: string,
+    year: number,
+    metricUsed: string = 'sharpeRatio'
+  ): Promise<AssetProfileRecord | null> {
+    const queryText = `
+      SELECT * FROM asset_profiles
+      WHERE symbol = $1 AND year = $2 AND metric_used = $3
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    const result = await pool.query(queryText, [symbol, year, metricUsed]);
+    
+    if (result.rows.length === 0) return null;
+    return result.rows[0] as AssetProfileRecord;
+  }
+
+  /**
    * Retrieves recent runs for a strategy.
    */
   async getRuns(strategyName: string, limit: number = 100): Promise<BacktestRun[]> {
