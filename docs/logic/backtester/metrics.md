@@ -25,6 +25,35 @@ Where:
 *   **> 2.0:** Excellent.
 *   **> 3.0:** Exceptional (or you have a bug/overfit).
 
-## 4. Win Rate
+## 4. Sortino Ratio
+Similar to Sharpe, but only penalizes *downside* volatility.
+*   **Why:** Upside volatility (price shooting up) is good! Sharpe punishes it; Sortino does not.
+*   **Formula:** (Mean Return - Target Return) / Downside Deviation
+*   **Interpretation:** A high Sortino means the strategy generates returns without crashing.
+
+## 5. Calmar Ratio
+A measure of return relative to drawdown risk.
+*   **Formula:** Annualized Return / Max Drawdown
+*   **Interpretation:**
+    *   **> 0.5:** Acceptable.
+    *   **> 1.0:** Excellent (Strategy makes 100% for every 100% risk).
+    *   **> 3.0:** Holy Grail territory.
+
+## 6. System Quality Number (SQN)
+Measures the statistical significance of the trading system. It answers: "Is this edge real or just luck?"
+*   **Formula:** $\sqrt{N} \times \frac{\text{Expectancy}}{\text{StdDev of R-Multiples}}$
+*   **Interpretation:**
+    *   **< 1.6:** Poor / Hard to trade.
+    *   **1.6 - 2.0:** Average.
+    *   **2.0 - 3.0:** Good.
+    *   **> 3.0:** Excellent.
+    *   **> 7.0:** Holy Grail.
+
+## 7. Expectancy
+The average dollar amount you expect to make (or lose) per trade.
+*   **Formula:** (Average Win * Win Rate) - (Average Loss * Loss Rate)
+*   **Interpretation:** Must be positive for a profitable system.
+
+## 8. Win Rate
 The percentage of trades that resulted in a profit.
 *   **Note:** A strategy can be profitable with a low win rate (e.g., 40%) if the winners are much larger than the losers (high Risk:Reward ratio).

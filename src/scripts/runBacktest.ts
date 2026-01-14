@@ -121,6 +121,10 @@ async function main() {
     console.log(`Max Drawdown:        ${result.metrics.maxDrawdownPct.toFixed(2)}%`);
     console.log(`Max Sector Exposure: ${((result.metrics.maxSectorExposurePct || 0) * 100).toFixed(2)}%`);
     console.log(`Sharpe Ratio:        ${result.metrics.sharpeRatio.toFixed(3)}`);
+    console.log(`Sortino Ratio:       ${result.metrics.sortinoRatio.toFixed(3)}`);
+    console.log(`Calmar Ratio:        ${result.metrics.calmarRatio.toFixed(3)}`);
+    console.log(`SQN:                 ${result.metrics.sqn.toFixed(2)}`);
+    console.log(`Expectancy:          $${result.metrics.expectancy.toFixed(2)}`);
     console.log(`Win Rate:            ${result.metrics.winRatePct.toFixed(2)}%`);
     console.log(`Total Trades:        ${result.trades.length}`);
 

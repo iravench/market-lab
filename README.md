@@ -199,6 +199,10 @@ The system follows a strict separation of concerns:
     Max Drawdown:        1.00%
     Max Sector Exposure: 17.00%
     Sharpe Ratio:        0.502
+    Sortino Ratio:       0.751
+    Calmar Ratio:        0.355
+    SQN:                 0.00
+    Expectancy:          $36.09
     Win Rate:            100.00%
     Total Trades:        3
 
