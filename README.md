@@ -112,7 +112,7 @@ The system follows a strict separation of concerns:
 
 * [x] **Math Library Expansion:** Implement `Hurst Exponent`, `Kaufman Efficiency Ratio (KER)`, and `Kurtosis` calculations.
 * [x] **Profiler Upgrade:** Integrate "Physics Mode" into the `RegimeProfiler` to calculate these metrics alongside empirical strategy results.
-* [ ] **Advanced Classification:** Move beyond `TRENDING/CHOPPY` to robust profiles:
+* [x] **Advanced Classification:** Move beyond `TRENDING/CHOPPY` to robust profiles:
     *   **Trend Runner (Persistent):** High Hurst (>0.5), High Efficiency.
     *   **Mean Reverter (Elastic):** Low Hurst (<0.5), Stationarity.
     *   **Regime Shifter (Volatile):** High Kurtosis (Fat Tails).

@@ -84,8 +84,10 @@ export class RegimeProfiler {
         [buyHoldRes.strategyName]: buyHoldRes.optimizationId
       };
 
+      const physics = { hurst, ker, kurtosis };
+
       // Delegate classification
-      const result = classifier.classify(scores);
+      const result = classifier.classify(scores, physics);
 
       // Identify the optimization ID of the winning strategy
       let winningOptId: string | null = null;

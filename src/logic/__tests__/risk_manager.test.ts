@@ -307,23 +307,23 @@ describe('RiskManager', () => {
   });
 
   it('should check regime compatibility (Regime Guard)', () => {
-    // 1. Choppy Regime: No strategies allowed
+    // 1. Choppy & Random Walk Regime: No strategies allowed
     expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'CHOPPY').compatible).toBe(false);
-    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'CHOPPY').compatible).toBe(false);
+    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'RANDOM_WALK').compatible).toBe(false);
 
-    // 2. Trending Regime: Only Trend Strategies
-    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'TRENDING').compatible).toBe(true);
-    expect(riskManager.checkRegimeCompatibility('VolatilityBreakoutStrategy', 'TRENDING').compatible).toBe(true);
+    // 2. Trend Runner Regime: Only Trend Strategies
+    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'TREND_RUNNER').compatible).toBe(true);
+    expect(riskManager.checkRegimeCompatibility('VolatilityBreakoutStrategy', 'TREND_RUNNER').compatible).toBe(true);
     
     // Mismatch
-    expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'TRENDING').compatible).toBe(false);
+    expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'TREND_RUNNER').compatible).toBe(false);
 
-    // 3. Mean Reversion Regime: Only MR Strategies
-    expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'MEAN_REVERSION').compatible).toBe(true);
-    expect(riskManager.checkRegimeCompatibility('BollingerMeanReversionStrategy', 'MEAN_REVERSION').compatible).toBe(true);
+    // 3. Mean Reverter Regime: Only MR Strategies
+    expect(riskManager.checkRegimeCompatibility('RsiStrategy', 'MEAN_REVERTER').compatible).toBe(true);
+    expect(riskManager.checkRegimeCompatibility('BollingerMeanReversionStrategy', 'MEAN_REVERTER').compatible).toBe(true);
     
     // Mismatch
-    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'MEAN_REVERSION').compatible).toBe(false);
+    expect(riskManager.checkRegimeCompatibility('EmaAdxStrategy', 'MEAN_REVERTER').compatible).toBe(false);
 
     // 4. Bull Market: Beta (BuyAndHold) and Trend allowed
     expect(riskManager.checkRegimeCompatibility('BuyAndHoldStrategy', 'BULL_MARKET').compatible).toBe(true);

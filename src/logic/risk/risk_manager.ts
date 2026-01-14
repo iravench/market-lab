@@ -243,14 +243,14 @@ export class RiskManager {
    * @returns { compatible: boolean, reason?: string }
    */
   public checkRegimeCompatibility(strategyName: string, regime: string): { compatible: boolean; reason?: string } {
-    if (regime === 'CHOPPY') {
-      return { compatible: false, reason: `Market is CHOPPY. No strategies allowed.` };
+    if (regime === 'CHOPPY' || regime === 'RANDOM_WALK') {
+      return { compatible: false, reason: `Market is ${regime}. No strategies allowed.` };
     }
 
     const mapping: Record<string, string[]> = {
-      'TRENDING': ['EmaAdxStrategy', 'VolatilityBreakoutStrategy'],
-      'MEAN_REVERSION': ['RsiStrategy', 'BollingerMeanReversionStrategy'],
-      'VOLATILE_BREAKOUT': ['VolatilityBreakoutStrategy'],
+      'TREND_RUNNER': ['EmaAdxStrategy', 'VolatilityBreakoutStrategy'],
+      'MEAN_REVERTER': ['RsiStrategy', 'BollingerMeanReversionStrategy'],
+      'REGIME_SHIFTER': ['VolatilityBreakoutStrategy'],
       'BULL_MARKET': ['BuyAndHoldStrategy', 'EmaAdxStrategy', 'VolatilityBreakoutStrategy']
     };
 
