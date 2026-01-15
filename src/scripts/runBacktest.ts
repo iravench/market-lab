@@ -9,48 +9,14 @@ import pool from '../db';
 import { RiskManager } from '../logic/risk/risk_manager';
 import { ASSET_METADATA_MAP } from '../config/assets';
 
-async function main() {
-
-  const args = process.argv.slice(2);
-  if (args.length < 3) {
-    console.error('Usage: npm run backtest <SYMBOLS_CSV> <START_DATE> <END_DATE> [STRATEGY_NAME]');
-    console.error('Example: npm run backtest "BTC-USD,ETH-USD" 2023-01-01 2023-12-31 "RsiStrategy"');
-    console.error('Available Strategies:', Object.keys(STRATEGY_REGISTRY).join(', '));
-    process.exit(1);
-  }
-
-  const [symbolsArg, startStr, endStr, strategyNameArg] = args;
-  
-  if (!symbolsArg || symbolsArg.trim() === '') {
-    console.error('❌ Error: Symbols argument cannot be empty.');
-    process.exit(1);
-  }
-
-  const symbols = symbolsArg.split(',').map(s => s.trim()).filter(s => s.length > 0);
-  if (symbols.length === 0) {
-    console.error('❌ Error: No valid symbols provided.');
-    process.exit(1);
-  }
-
-  const startDate = new Date(startStr);
-  const endDate = new Date(endStr);
-
-  if (isNaN(startDate.getTime())) {
-    console.error(`❌ Error: Invalid Start Date "${startStr}". Use YYYY-MM-DD format.`);
-    process.exit(1);
-  }
-  if (isNaN(endDate.getTime())) {
-    console.error(`❌ Error: Invalid End Date "${endStr}". Use YYYY-MM-DD format.`);
-    process.exit(1);
-  }
-  if (startDate >= endDate) {
-    console.error('❌ Error: Start Date must be before End Date.');
-    process.exit(1);
-  }
-
+export async function runBacktestSimulation(
+  symbols: string[],
+  startDate: Date,
+  endDate: Date,
+  strategyName: string = 'RsiStrategy'
+) {
   const interval = '1d'; // Default to daily for now
   
-  const strategyName = strategyNameArg || 'RsiStrategy';
   const StrategyClass = STRATEGY_REGISTRY[strategyName];
 
   if (!StrategyClass) {
@@ -72,7 +38,8 @@ async function main() {
 
     if (universe.size === 0 || universe.get(symbols[0])!.length === 0) {
       console.error(`❌ No data found for specified universe.`);
-      process.exit(1);
+      // Return early instead of exit so CLI doesn't die
+      return;
     }
 
     // Check if we lost too much data due to alignment
@@ -178,8 +145,61 @@ async function main() {
   } catch (err) {
     console.error('❌ Error running backtest:', err);
   } finally {
-    await pool.end();
+    // Only close pool if running as script to avoid side effects
+    // But since this function is async and used by CLI, CLI should handle connection closing or 
+    // we should make sure we don't close it prematurely if we want to run multiple things.
+    // For now, let's remove pool.end() from here and let the caller handle it or keep it if it's fine.
+    // The original code had pool.end(). 
+    // If CLI calls this, CLI will need pool.
+    // If we close pool here, CLI might fail on subsequent calls.
+    // Best practice: The one who started the app closes the pool.
+    // But for this function, let's leave it open and let caller close it.
   }
 }
 
-main();
+async function main() {
+
+  const args = process.argv.slice(2);
+  if (args.length < 3) {
+    console.error('Usage: npm run backtest <SYMBOLS_CSV> <START_DATE> <END_DATE> [STRATEGY_NAME]');
+    console.error('Example: npm run backtest "BTC-USD,ETH-USD" 2023-01-01 2023-12-31 "RsiStrategy"');
+    console.error('Available Strategies:', Object.keys(STRATEGY_REGISTRY).join(', '));
+    process.exit(1);
+  }
+
+  const [symbolsArg, startStr, endStr, strategyNameArg] = args;
+  
+  if (!symbolsArg || symbolsArg.trim() === '') {
+    console.error('❌ Error: Symbols argument cannot be empty.');
+    process.exit(1);
+  }
+
+  const symbols = symbolsArg.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  if (symbols.length === 0) {
+    console.error('❌ Error: No valid symbols provided.');
+    process.exit(1);
+  }
+
+  const startDate = new Date(startStr);
+  const endDate = new Date(endStr);
+
+  if (isNaN(startDate.getTime())) {
+    console.error(`❌ Error: Invalid Start Date "${startStr}". Use YYYY-MM-DD format.`);
+    process.exit(1);
+  }
+  if (isNaN(endDate.getTime())) {
+    console.error(`❌ Error: Invalid End Date "${endStr}". Use YYYY-MM-DD format.`);
+    process.exit(1);
+  }
+  if (startDate >= endDate) {
+    console.error('❌ Error: Start Date must be before End Date.');
+    process.exit(1);
+  }
+
+  await runBacktestSimulation(symbols, startDate, endDate, strategyNameArg);
+  await pool.end();
+}
+
+if (require.main === module) {
+  main();
+}

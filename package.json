@@ -3,8 +3,12 @@
   "version": "1.0.0",
   "description": "To master financial market mechanics and investment strategies by building a robust, verifiable simulation engine from the ground up. This project serves as both a technical playground (TypeScript/Node.js) and a financial learning tool.",
   "main": "index.js",
+  "bin": {
+    "ml": "./src/cli.ts"
+  },
   "scripts": {
     "start": "ts-node src/index.ts",
+    "cli": "ts-node src/cli.ts",
     "migrate": "ts-node src/db/migrate.ts",
     "backfill": "ts-node src/scripts/backfill.ts",
     "verify": "ts-node src/scripts/verifyData.ts",
@@ -23,6 +27,7 @@
   "dependencies": {
     "@types/node": "^25.0.3",
     "@types/pg": "^8.16.0",
+    "commander": "^14.0.2",
     "dotenv": "^17.2.3",
     "pg": "^8.16.3",
     "ts-node": "^10.9.2",
