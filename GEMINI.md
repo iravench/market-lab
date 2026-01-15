@@ -1,29 +1,18 @@
-# Gemini Context: Market Lab
+# GEMINI Project Context for `Market Lab`
 
 ## 1. Ground Truth
 Always start with establishing ground truth by ingesting following sources:
 - **`README.md`**: Project summary, philosophy, architecture, roadmap, setup instructions and usage.
 - **`docs/`**: Source of truth for math, design, logic and feature proposals.
 
-## 2. Development Mandates
-1. **Milestone First**: Identify active Phase in `README.md`. No phase = no dev.
-2. **Doc-Driven**: Document new/updated logic in `docs/` *before* implementation.
-3. **Logic Testing**: All code in `src/logic/` and `src/services/` requires unit tests. No exceptions.
-4. **Zero Regression**: `npm test` must pass before every commit.
-
-## 3. Folder Structure
-- `docs/`: Source of truth for math, design, and architecture.
-- `src/logic/`: Pure functions (Indicators, Math, Strategies).
+## 2. Folder Structure
+- `docs/`: Source of truth for knowledge: math, design, logic, variarious proposals(some might not make it to final implementation) and architecture.
+- `src/logic/`: market indicators, math functions, trading strategies, regime profiling, risk management, portfolio optimization and backtesting.
 - `src/services/`: External API integrations (Market Data).
 - `src/scripts/`: CLI entry points for user interaction.
 - `src/db/`: Persistence & Migrations.
 
-## 4. Documentation Strategy
-- Explain **WHY** in comments, short and concise.
-- Document without low level implementation details in `docs/`.
-
-## 5. Other Rules
-- Use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
-
-## 6. Engineering Mandates
-@./software_engineering_protocol.md
+## 3. Development Mandates
+1. **Milestone First**: Identify active Milestone/Development Phase from `README.md` roadmap section. No active phase = no dev.
+2. **Doc-Driven**: Document logic/knowledge in `docs/` *before* implementation. And keep them consistent, up-to-date and without duplications.
+3. **Engineering Mandates**: Follow @./software_engineering_protocol.md
